@@ -9,6 +9,8 @@ import {
   TextInput,
   Dimensions,
   BackHandler,
+  ScrollView,
+  TouchableOpacity
 } from 'react-native';
 import {queryFetch} from '../../database/DBAction';
 import {
@@ -28,7 +30,9 @@ import {
 } from '@react-navigation/native';
 import {useDispatch, useSelector} from 'react-redux';
 import Button from '../../../components/Button';
-import {TouchableOpacity} from 'react-native-gesture-handler';
+import ErrorText from '../../../components/ErrorText';
+import {useFormik} from 'formik';
+import * as Yup from 'yup';
 import {runSqlQuery} from '../../database/DBSaga';
 import {
   setHistoryCartList,
@@ -36,7 +40,19 @@ import {
 } from '../TransactionAction';
 import AntDesignIcon from 'react-native-vector-icons/AntDesign';
 import {dateTimeToFormat, stringToCurrency} from '../../../util';
-import {useIsDrawerOpen} from '@react-navigation/drawer';
+import Modal from 'react-native-modal';
+
+const discountScheme = Yup.object().shape({
+  discount: Yup.string()
+    .matches(/^[0-9]+$/, 'Only number')    
+});
+
+const formList = [
+  {
+    key: 'discount',
+    value: 'Discount',
+  },
+];
 
 function Transaction() {
   const query = useSelector(state => state.query);
@@ -55,11 +71,25 @@ function Transaction() {
   const [dataTableFocusItems, setDataTableFocusItems] = useState();
   const [cartUpdateIndex, setCartUpdateIndex] = useState(false);
   const [cartList, setCartList] = useState([]);
+  const [cartListBck, setCartListBck] = useState([]);
   const [grandTotalDiscount, setGrandTotalDiscount] = useState(0);
   const [grandTotal, setGrandTotal] = useState(0);
   const [itemsListBackup, setItemListBackup] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [cartListIndex, setCartListIndex] = useState(null);
+  const [discountModal, setDiscountModal] = useState(false);
+  const [discountValue, setDiscountValue] = useState(0)
+
+  const formik = useFormik({
+    initialValues: {
+      discount: "",
+    },
+    validationSchema: discountScheme,
+    onSubmit: async values => {      
+      if (values.discount == "") addDiscount(0)
+      else addDiscount(values.discount)      
+    },
+  });
 
   const headerTableCategory = [
     {
@@ -103,8 +133,8 @@ function Transaction() {
     await apiGetItemsList(param);
   }, [category.code]);
 
-  useEffect(async () => {
-    if (transaction.historyCartList != null) {
+  useEffect(async () => {    
+    if (transaction.historyCartList != null) {      
       let tmp = transaction.historyCartList;
       let newArray = [];
 
@@ -120,19 +150,21 @@ function Transaction() {
         };
         await newArray.push(obj);
       }
-
       setCartList(newArray);
-      calculate(newArray);
+      calculate(newArray, transaction.historyCartListHeader.discount);
       setCartUpdateIndex(!cartUpdateIndex);
+    }  
+    
+    if (transaction.historyCartListHeader != null) {  
+      setDiscountValue(transaction.historyCartListHeader.discount)            
+      formik.setFieldValue("discount", transaction.historyCartListHeader.discount.toString())
     }
+
   }, [transaction.historyCartList, transaction.historyCartListHeader]);
 
   useFocusEffect(
     useCallback(() => {
-      const unsubscribe = apiGetCategoryList();
-      // const unsubscribe1 = apiGetItemsListAll();
-      // setDataTableFocusCategory(0);
-      // setDataTableFocusItems();
+      const unsubscribe = apiGetCategoryList();      
       const onBackPress = e => {
         if (transaction.historyCartListHeader != null) {
           dispatch(setHistoryCartList(null));
@@ -232,9 +264,7 @@ function Transaction() {
         ...item,
         qty: 1,
         total: item.price - item.discount,
-      };
-      // obj.qty = 1;
-      // obj.total = obj.qty * (obj.price - obj.discount);
+      };      
       tmp.push(newObj);
     }
 
@@ -245,7 +275,7 @@ function Transaction() {
     setCartUpdateIndex(!tmp1);
   }
 
-  function calculate(data = null) {
+  function calculate(data = null, discount = null) {
     let tmpTotalDiscount = 0;
     let tmpGrandTotal = 0;
     let tmp = data != null ? data : cartList;
@@ -261,10 +291,13 @@ function Transaction() {
             ? tmp[i].discountNew
             : tmp[i].discount));
       tmpGrandTotal += tmp[i].total;
-    }
+    }    
 
-    setGrandTotalDiscount(tmpTotalDiscount);
-    setGrandTotal(tmpGrandTotal);
+    // setGrandTotalDiscount(tmpTotalDiscount);        
+    setGrandTotal(tmpGrandTotal - discountValue);
+    if(discount != null){
+      setGrandTotal(tmpGrandTotal - discount);
+    }    
   }
 
   function apiGetCategoryList() {
@@ -337,7 +370,9 @@ function Transaction() {
               key={i}
               style={{flex: 1, flexDirection: 'row', alignItems: 'center'}}>
               <View style={{flex: 1}}>
-                <Text style={_s.listText}>{item[v.key]}</Text>
+                <Text style={[_s.listText, _style.listItemHeaderText]}>
+                  {item[v.key]}
+                </Text>
               </View>
               <View style={{alignItems: 'flex-end'}}>
                 <Text style={_s.listText}>{stringToCurrency(item.price)}</Text>
@@ -392,7 +427,9 @@ function Transaction() {
               style={{flex: 1, flexDirection: 'row', alignItems: 'center'}}>
               {v.key == 'name' ? (
                 <View style={{flex: 1}}>
-                  <Text style={_s.listText}>{item.name}</Text>
+                  <Text style={[_s.listText, _style.listItemHeaderText]}>
+                    {item.name}
+                  </Text>
                 </View>
               ) : null}
               {v.key == 'price' ? (
@@ -442,35 +479,13 @@ function Transaction() {
   }
 
   function clearCartList() {
-    // Alert.alert(
-    //   'Confirmation',
-    //   'Are you sure to clear all the data?',
-    //   [
-    //     {
-    //       style: 'cancel',
-    //       text: 'cancel',
-    //     },
-    //     {
-    //       style: 'default',
-    //       text: 'Yes',
-    //       onPress: () => {
-    //         setCartList([]);
-    //         setGrandTotalDiscount(0);
-    //         setGrandTotal(0);
-    //       },
-    //     },
-    //   ],
-    //   {
-    //     cancelable: false,
-    //   },
-    // );
-    setCartList([]);
-    setGrandTotalDiscount(0);
+    setCartList([]);    
+    setDiscountValue(0);
     setGrandTotal(0);
+    formik.resetForm()
   }
 
-  function searchText(text) {
-    console.log(itemsListBackup);
+  function searchText(text) {    
     let newArray = [];
     for (let i = 0; i < itemsListBackup.length; i++) {
       let tmp = itemsListBackup[i].name.toLowerCase();
@@ -545,62 +560,38 @@ function Transaction() {
     let currentDateTimeFormatted = dateTimeToFormat(today);
 
     if (transaction.historyCartListHeader != null) {
-      console.log('Cart list :', cartList);
 
       let paramHeader = [];
       paramHeader.push(currentDateTimeFormatted);
-      paramHeader.push(grandTotalDiscount);
+      paramHeader.push(discountValue);
       paramHeader.push(grandTotal);
       paramHeader.push(status);
       paramHeader.push(transaction.historyCartListHeader.id);
 
       await apiUpdateToTrxHeader(paramHeader);
+      await apiDeleteToTrxDetailBy([transaction.historyCartListHeader.id]);
 
       for (let i = 0; i < cartList.length; i++) {
         let paramDetail = [];
-        if (cartList[i].id_trx_detail != undefined) {
-          paramDetail.push(cartList[i].code);
-          paramDetail.push(cartList[i].name);
-          paramDetail.push(
-            cartList[i].priceNew != undefined
-              ? cartList[i].priceNew
-              : cartList[i].price,
-          );
-          paramDetail.push(
-            cartList[i].discountNew != undefined
-              ? cartList[i].discountNew
-              : cartList[i].discount,
-          );
-          paramDetail.push(cartList[i].qty);
-          paramDetail.push(cartList[i].total);
-          paramDetail.push(cartList[i].id_trx_detail);
-          await apiUpdateToTrxDetail(paramDetail);
-        } else {
-          paramDetail.push(transaction.historyCartListHeader.id);
-          paramDetail.push(cartList[i].code);
-          paramDetail.push(cartList[i].name);
-          paramDetail.push(
-            cartList[i].priceNew != undefined
-              ? cartList[i].priceNew
-              : cartList[i].price,
-          );
-          paramDetail.push(
-            cartList[i].discountNew != undefined
-              ? cartList[i].discountNew
-              : cartList[i].discount,
-          );
-          paramDetail.push(cartList[i].qty);
-          paramDetail.push(cartList[i].total);
-          paramDetail.push(currentDateTimeFormatted);
-          await apiInsertToTrxDetail(paramDetail);
-        }
-      }
-
-      if (cartList.length == 0) {
-        let param = [];
-        param.push(transaction.historyCartListHeader.id);
-        await apiDeleteToTrxDetailBy(param);
-      }
+        let x = cartList[i]
+        paramDetail.push(transaction.historyCartListHeader.id);
+        paramDetail.push(x.code);
+        paramDetail.push(x.name);
+        paramDetail.push(
+          x.priceNew != undefined
+            ? x.priceNew
+            : x.price,
+        );
+        paramDetail.push(
+          x.discountNew != undefined
+            ? x.discountNew
+            : x.discount,
+        );
+        paramDetail.push(x.qty);
+        paramDetail.push(x.total);
+        paramDetail.push(currentDateTimeFormatted);
+        await apiInsertToTrxDetail(paramDetail);
+      }      
 
       dispatch(setHistoryCartList(null));
       dispatch(setHistoryCartListHeader(null));
@@ -608,7 +599,7 @@ function Transaction() {
     } else {
       let paramHeader = [];
       paramHeader.push(currentDateTimeFormatted);
-      paramHeader.push(grandTotalDiscount);
+      paramHeader.push(discountValue);
       paramHeader.push(grandTotal);
       paramHeader.push(status);
       paramHeader.push(currentDateTimeFormatted);
@@ -634,8 +625,7 @@ function Transaction() {
         );
         paramDetail.push(cartList[i].qty);
         paramDetail.push(cartList[i].total);
-        paramDetail.push(currentDateTimeFormatted);
-        console.log(paramDetail);
+        paramDetail.push(currentDateTimeFormatted);        
         await apiInsertToTrxDetail(paramDetail);
       }
     }
@@ -710,11 +700,22 @@ function Transaction() {
     );
   }
 
+  function addDiscount(values) {
+    setGrandTotal(parseInt(grandTotal) + parseInt(discountValue) - parseInt(values))
+    setDiscountModal(false)
+    setDiscountValue(values)    
+  }
+
+  function cancelDiscount() {
+    setDiscountModal(false)    
+    // formik.resetForm()
+  }
+
   return (
     <Container>
       {transaction.historyCartListHeader != null ? (
         <Header
-          name={`Transaksi No #${transaction.historyCartListHeader.id}`}
+          name={`Transaction No #${transaction.historyCartListHeader.id}`}
           submitBtnComponent={
             <AntDesignIcon name="delete" size={20} color="#ff6961" />
           }
@@ -722,7 +723,7 @@ function Transaction() {
           submitBtnFunc={hapusInvoice}
         />
       ) : (
-        <Header drawerBtn name="Transaksi" />
+        <Header drawerBtn name="Transaction" />
       )}
       <View style={_s.menuBarContainer}>
         <View style={{flex: 1}}>
@@ -781,9 +782,9 @@ function Transaction() {
             <View style={{flex: 1}}>
               <Text style={_s.totalHeaderText}>Discount</Text>
             </View>
-            <View>
-              <Text>{stringToCurrency(grandTotalDiscount)}</Text>
-            </View>
+            <TouchableOpacity onPress={() => setDiscountModal(true)} disabled={cartList.length == 0 ? true : false}>
+              <Text style={_s.totalHeaderText}>{discountValue == 0 ? "Add Discount" : stringToCurrency(discountValue)}</Text>
+            </TouchableOpacity>
           </View>
           <View style={_s.totalHeaderContainer}>
             <View style={{flex: 1}}>
@@ -818,6 +819,63 @@ function Transaction() {
           )}
         </View>
       </View>
+
+      <Modal
+        isVisible={discountModal}
+        style={{margin: 1}}
+        onBackdropPress={cancelDiscount}
+        onBackButtonPress={cancelDiscount}>
+        <View style={{flex: 1, backgroundColor: 'white'}}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: 15,
+              paddingTop: 15,
+            }}>
+            <TouchableOpacity onPress={cancelDiscount}>
+              <AntDesignIcon
+                name="close"
+                size={25}
+                color="black"
+                style={{marginRight: 5}}
+              />
+            </TouchableOpacity>
+            <View style={{flex: 1}}>
+              <Text style={_s.modalHeader}>Add Discount</Text>
+            </View>
+          </View>
+          <View style={{flex: 1, marginTop: 15,}}>
+            <ScrollView>
+              {formList.map((item, index) => (
+                <View style={_s.fieldContainer} key={index}>
+                  <Text style={_s.fieldHeaderText}>{item.value}</Text>
+                  <View style={{marginHorizontal: 10}}>
+                    <TextInput                      
+                      style={_s.fieldText}
+                      contextMenuHidden={true}
+                      key={index}
+                      onChangeText={formik.handleChange(item.key)}
+                      onBlur={formik.handleBlur(item.key)}
+                      value={formik.values[item.key]}
+                      clearButtonMode="while-editing"
+                      returnKeyType="done"                 
+                      keyboardType="numeric"     
+                      onSubmitEditing={formik.handleSubmit}
+                    />
+                    {formik.errors[item.key] && formik.touched[item.key] ? (
+                      <ErrorText text={formik.errors[item.key]} />
+                    ) : null}
+                  </View>
+                </View>
+              ))}              
+            </ScrollView>
+          </View>
+          <View>
+            <Button btnText="Simpan" onPress={formik.handleSubmit} />
+          </View>
+        </View>
+      </Modal>
     </Container>
   );
 }
@@ -871,6 +929,49 @@ const _s = StyleSheet.create({
   hapusSemuaText: {
     color: '#5395B5',
     ..._style.listItemHeaderText,
+  },
+  filterContainer: {
+    flexDirection: 'row',
+    margin: 10,
+    alignItems: 'center',
+  },
+  filterBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#eee',
+    borderRadius: 10,
+    marginRight: 8,
+  },
+  filterText: {
+    ..._style.bodyText,
+    textTransform: 'capitalize',
+  },
+  filterHeader: {
+    ..._style.listItemHeaderText,
+    textTransform: 'capitalize',
+    marginTop: 25,
+  },
+  modalHeader: {
+    ..._style.listItemHeaderText,
+    fontSize: 20,
+    marginLeft: 8,
+  },
+  fieldContainer: {
+    paddingHorizontal: 10,
+    marginVertical: 10,
+  },
+  fieldHeaderText: {
+    ..._style.bodyText,
+    paddingHorizontal: 10,
+    color: '#888',
+  },
+  fieldText: {
+    ..._style.listItemHeaderText,
+    paddingHorizontal: 0,
+    borderBottomColor: '#eee',
+    borderBottomWidth: 1,
+    fontSize: 16,
   },
 });
 

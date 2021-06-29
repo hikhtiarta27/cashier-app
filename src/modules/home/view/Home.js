@@ -20,13 +20,6 @@ function Home(){
   const db = useSelector(state => state.database);
   const query = useSelector(state => state.query);
 
-  useEffect(()=>{
-    if (query.res != null){
-      console.log(query.res.rows.item(1))
-    }
-    console.log(query)
-  }, [query])
-
   function openDb(){
     dispatch(dbFetch())
   }  

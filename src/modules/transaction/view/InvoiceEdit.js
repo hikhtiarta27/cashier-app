@@ -62,10 +62,7 @@ function InvoiceEdit() {
       items['qty'] = (deleted ? 0 : values.qty)
       items['priceNew'] = values.price
       items['discountNew'] = values.discount
-      navigation.setParams({Transaction: route.params.onCallback()})
-      // navigation.navigate('Transaction', {
-      //   invoiceEditResult: items
-      // })
+      navigation.setParams({Transaction: route.params.onCallback()})      
       navigation.goBack()      
     },
   });
@@ -74,19 +71,12 @@ function InvoiceEdit() {
     formik.setFieldValue('qty','0')
     formik.handleSubmit()
   }
-
-  // function apiUpdateItems(param){
-  //   dispatch(queryFetch({
-  //     sql: QUERY_ITEM.UPDATE,
-  //     param
-  //   }))
-  // }
-
+  
   return (
     <Container>
       <Header
         backBtn={true}
-        name="Invoice Edit"
+        name="Detail Edit"
         submitBtn
         submitBtnFunc={formik.handleSubmit}
         submitBtnName="Save"
@@ -98,6 +88,7 @@ function InvoiceEdit() {
             <View style={{marginHorizontal: 10}}>
               <TextInput
                 style={_s.fieldText}
+                contextMenuHidden={true}
                 key={index}
                 editable={
                   item.key == 'name'
@@ -146,6 +137,7 @@ const _s = StyleSheet.create({
     paddingHorizontal: 0,
     borderBottomColor: '#eee',
     borderBottomWidth: 1,
+    fontSize: 16,
   },
 });
 

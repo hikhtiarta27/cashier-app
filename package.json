@@ -7,7 +7,10 @@
     "ios": "react-native run-ios",
     "start": "react-native start",
     "test": "jest",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "emulator": "cd ~/Library/Android/sdk/emulator && ./emulator -avd Nexus_7_API_30",
+    "android:reset": "adb shell \"pm uninstall com.cashier\" ",
+    "release": "cd android && ./gradlew assembleRelease"
   },
   "dependencies": {
     "@react-native-community/async-storage": "^1.12.1",
@@ -24,6 +27,7 @@
     "react-native-document-picker": "^5.2.0",
     "react-native-fs": "^2.18.0",
     "react-native-gesture-handler": "^1.10.3",
+    "react-native-masked-text": "^1.13.0",
     "react-native-modal": "^12.0.2",
     "react-native-reanimated": "^2.2.0",
     "react-native-safe-area-context": "^3.2.0",

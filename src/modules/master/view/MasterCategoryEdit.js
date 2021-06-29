@@ -114,6 +114,7 @@ const _s = StyleSheet.create({
     paddingHorizontal: 0,
     borderBottomColor: '#eee',
     borderBottomWidth: 1,
+    fontSize: 16,
   },
 });
 

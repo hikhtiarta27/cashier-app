@@ -8,12 +8,13 @@ import {
   StyleSheet,
   TouchableHighlight,
   Alert,
+  TextInput
 } from 'react-native';
 import {writeFile, readFile} from 'react-native-fs';
 import {useDispatch, useSelector} from 'react-redux';
 import XLSX from 'xlsx';
 import {queryFetch} from '../../database/DBAction';
-import {QUERY_ITEM} from '../../../config/StaticQuery';
+import {QUERY_ITEM, QUERY_CATEGORY} from '../../../config/StaticQuery';
 import Container from '../../../components/Container';
 import Button from '../../../components/Button';
 import Header from '../../../components/Header';
@@ -21,6 +22,8 @@ import _style from '../../../styles/Typrograhpy';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import DocumentPicker from 'react-native-document-picker';
 import {stringToCurrency} from '../../../util';
+import AntDesignIcon from 'react-native-vector-icons/AntDesign';
+import Modal from 'react-native-modal';
 
 function MasterItem() {
   const query = useSelector(state => state.query);
@@ -29,6 +32,14 @@ function MasterItem() {
   const [itemsList, setItemsList] = useState([]);
   const [items, setItems] = useState({});
   const [dataTableFocus, setDataTableFocus] = useState(0);
+  const [counterFilter,setCounterFilter] = useState(0)
+
+  const [filterVisible, setFilterVisible] = useState(false);
+  const [filterCategoryModalFocus, setFilterCategoryModalFocus] = useState(0);
+  const [categoryList, setCategoryList] = useState([]);
+  const [categoryListBackup, setCategoryListBackup] = useState([]);
+  const [itemsListBackup, setItemListBackup] = useState([]);
+  const [filterCategoryText, setFilterCategoryText] = useState("")
 
   const headerTable = [
     {
@@ -57,6 +68,15 @@ function MasterItem() {
     },
   ];
 
+  function apiGetCategoryList() {
+    dispatch(
+      queryFetch({
+        sql: QUERY_CATEGORY.SELECT,
+      }),
+    );
+  }
+
+
   function apiGetItemsList() {
     dispatch(
       queryFetch({
@@ -82,22 +102,31 @@ function MasterItem() {
     );
   }
 
+  function apiGetItemListByCategoryCode(param) {
+    dispatch(
+      queryFetch({
+        sql: QUERY_ITEM.SELECT_BY_CATEGORY_CODE,
+        param: param,
+      }),
+    );
+  }
+
   //api call only run once
   useEffect(() => {
-    apiGetItemsList();
+    apiGetItemsList();    
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      const unsubscribe = apiGetItemsList();
-      return () => unsubscribe;
-    }, []),
-  );
+  // useFocusEffect(
+  //   useCallback(() => {
+  //     const unsubscribe = apiGetItemsList();      
+  //     return () => unsubscribe;
+  //   }, []),
+  // );
 
   //get updated data
   useEffect(() => {
     if (!query.fetchQuery) {
-      if (query.send.sql == QUERY_ITEM.SELECT) {
+      if (query.send.sql == QUERY_ITEM.SELECT || query.send.sql == QUERY_ITEM.SELECT_BY_CATEGORY_CODE) {
         let rows = query.res.rows;
         if (rows.length > 0) {
           let resultList = [];
@@ -106,10 +135,29 @@ function MasterItem() {
           }
           setItems(resultList[0]);
           setItemsList(resultList);
+          setItemListBackup(resultList);
           setDataTableFocus(0);
+          apiGetCategoryList();
         } else {
           setItems(null);
           setItemsList([]);
+          setItemListBackup([]);
+        }
+      }
+
+      if (query.send.sql == QUERY_CATEGORY.SELECT) {
+        let rows = query.res.rows;
+        if (rows.length > 0) {
+          let resultList = [];
+          for (let i = 0; i < rows.length; i++) {
+            resultList.push(rows.item(i));
+          }                            
+          setCategoryList(resultList);          
+          setCategoryListBackup(resultList);          
+        } else {          
+          setCategoryList([]);
+          setCategoryListBackup([]);
+
         }
       }
     }
@@ -211,9 +259,171 @@ function MasterItem() {
     );
   }
 
+  async function handleFilter(){       
+    if(filterCategoryText != "") setCounterFilter(1)
+    else setCounterFilter(0)
+    
+    if(filterCategoryText != ""){
+      let param = []
+      param.push(filterCategoryText)
+      apiGetItemListByCategoryCode(param)
+    }else{
+      apiGetItemsList()
+    }
+
+    setFilterVisible(!filterVisible)
+  }
+
+  function cancelFilter(){    
+    setFilterVisible(!filterVisible)
+  }
+
+  function searchText(text) {    
+    let newArray = [];
+    for (let i = 0; i < itemsListBackup.length; i++) {
+      let tmp = itemsListBackup[i].name.toLowerCase();
+      text = text.toLowerCase();
+      if (tmp.indexOf(text) != -1) {
+        newArray.push(itemsListBackup[i]);
+      }
+    }
+    setItemsList(newArray);
+    setItems(itemsList[dataTableFocus])
+  }
+  
+  function searchTextCategory(text) {    
+    let newArray = [];
+    for (let i = 0; i < categoryListBackup.length; i++) {
+      let tmp = categoryListBackup[i].code.toLowerCase();
+      text = text.toLowerCase();
+      if (tmp.indexOf(text) != -1) {        
+        newArray.push(categoryListBackup[i]);
+      }
+    }      
+    if(text.length == 0) setFilterCategoryText("")  
+    setCategoryList(newArray);
+  }
+
   return (
     <Container>
+      <Modal
+        isVisible={filterVisible}
+        style={{margin: 1}}
+        onBackdropPress={cancelFilter}
+        onBackButtonPress={cancelFilter}>
+        <View style={{flex: 1, backgroundColor: 'white'}}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: 15,
+              paddingTop: 15,
+            }}>
+            <TouchableOpacity onPress={cancelFilter}>
+              <AntDesignIcon
+                name="close"
+                size={25}
+                color="black"
+                style={{marginRight: 5}}
+              />
+            </TouchableOpacity>
+            <View style={{flex: 1}}>
+              <Text style={_s.modalHeader}>Filter</Text>
+            </View>
+            {/* {(isDateFilter || filterStatusFocus || filterItemFocus != 0) && <TouchableOpacity onPress={()=>{
+              setIsDateFilter(false)
+              setFilterCategoryModalFocus(0)
+              // setFilterStatusFocusPrev(filterStatusFocus)
+              setFilterStatusFocus(0)              
+            }}>
+              <Text style={[_s.modalHeader, {color: "#68BBE3"}]}>Reset</Text>
+            </TouchableOpacity> } */}
+          </View>
+          <View style={{flex: 1, paddingHorizontal: 15}}>
+            <Text style={_s.filterHeader}>Kategori</Text>
+            <View style={{marginTop: 10}}>
+              <TextInput
+                style={[_s.searchField, {borderColor: "#eee", borderWidth: 1, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 10}]}
+                placeholder="Search by category code..."
+                onChangeText={text => searchTextCategory(text)}
+                defaultValue={filterCategoryText}
+              />
+            </View>
+            <View style={{flexDirection: 'row', marginTop: 10}}>              
+              {categoryList.length != 0 && categoryList.map((item, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    _s.filterBtn,
+                    filterCategoryText == item.code
+                      ? {borderColor: '#274472', borderWidth: 1}
+                      : null,
+                  ]}
+                  activeOpacity={1} onPress={()=>setFilterCategoryText(item.code)}>
+                  <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                    <Text style={_s.filterText}> {item.code} - {item.name} </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {/* <Text style={_s.filterHeader}>Status</Text>
+            <View style={{flexDirection: 'row', marginTop: 10,}}>
+              {filterStatus.map((item, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    _s.filterBtn,
+                    filterStatusFocus == index
+                      ? {borderColor: '#274472', borderWidth: 1,}
+                      : null,
+                  ]}
+                  activeOpacity={1}
+                  onPress={() => setFilterStatusFocus(index)}>
+                  <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                    <Text style={_s.filterText}>{item}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>             */}
+          </View>
+          <View>
+            <Button btnText="Simpan" onPress={handleFilter}/>
+          </View>
+        </View>
+      </Modal>
+
       <Header drawerBtn={true} name="Master Items" />
+
+      <View style={_s.filterContainer}>
+        <TouchableOpacity
+          style={_s.filterBtn}
+          activeOpacity={1}
+          onPress={() => setFilterVisible(!filterVisible)}>
+          <View style={{flexDirection: 'row', alignItems: 'center'}}>
+            {counterFilter != 0 ? (
+              <View style={_s.counterFilterContainer}>
+                <Text>{counterFilter}</Text>
+              </View>
+            ) : (
+              <AntDesignIcon
+                name="filter"
+                size={20}
+                color="black"
+                style={{marginRight: 5}}
+              />
+            )}
+            <Text style={_s.filterText}>Filter </Text>
+          </View>
+        </TouchableOpacity>
+        <View style={{flex: 1}}>
+          <TextInput
+            style={_s.searchField}
+            placeholder="Search by item name..."
+            onChangeText={text => searchText(text)}
+          />
+        </View>
+      </View>
+
       <View style={_s.flexRow}>
         <View style={{flex: 2, borderRightColor: '#eee', borderRightWidth: 3}}>
           <FlatList
@@ -314,6 +524,62 @@ const _s = StyleSheet.create({
   },
   itemsDetailChildText: {
     ..._style.bodyText,
+  },
+  filterContainer: {
+    flexDirection: 'row',
+    margin: 10,
+    alignItems: 'center'
+  },
+  filterBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#eee',
+    borderRadius: 10,
+    marginRight: 8,
+  },
+  filterText: {
+    ..._style.bodyText,
+    textTransform: 'capitalize',
+  },
+  filterHeader: {
+    ..._style.listItemHeaderText,
+    textTransform: 'capitalize',
+    marginTop: 25,
+  },
+  pilihTanggalContainer: {
+    // marginTop: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#eee',
+    alignSelf: 'flex-start',
+  },
+  pilihTanggalContainerFocus: {
+    // marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#41729F',
+    alignSelf: 'flex-start',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+  },
+  modalHeader: {
+    ..._style.listItemHeaderText,
+    fontSize: 20,
+    marginLeft: 8,
+  },
+  counterFilterContainer: {
+    borderColor: '#41729F',
+    borderWidth: 1,
+    paddingHorizontal: 5,
+    marginRight: 7,
+    borderRadius: 15,
+  },
+  searchField: {
+    marginVertical: 0,
+    paddingVertical: 0,
   },
 });
 

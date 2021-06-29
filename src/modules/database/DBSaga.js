@@ -17,8 +17,7 @@ function* workerDatabaseOpen() {
     const {database} = yield select(state => state.database);
     if (!database) {
       const db = yield call(SQLite.openDatabase, {
-        name: 'db-cashier.db',
-        createFromLocation: 1,
+        name: 'db-cashier.db',        
       });      
       yield putResolve(dbSuccess(db));      
     }        
@@ -32,8 +31,7 @@ function* workerDatabaseClose() {
     const {database} = yield select(state => state.database);
     if (database) {
       yield call(database.close);
-      yield putResolve(dbClose());
-      console.log('Database close');
+      yield putResolve(dbClose());      
     }
   } catch (error) {
     yield putResolve(dbFailed(error));
@@ -47,8 +45,7 @@ export function runSqlQuery(db, query, params = []) {
         query,
         params,
         (tx, results) => {
-          resolve(results) 
-          console.log(results)         
+          resolve(results)            
         },
         (tx, err) => console.log("error on : ", tx)
       );

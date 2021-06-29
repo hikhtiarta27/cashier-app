@@ -20,6 +20,12 @@ import {
   Animated
 } from 'react-native'
 
+import Other from '../../other/view/Other';
+import OtherHistory from '../../other/view/OtherHistory';
+import ChangePassword from '../../other/view/ChangePassword';
+
+
+
 const Stack = createStackNavigator();
 const Drawer = createDrawerNavigator();
 
@@ -50,12 +56,22 @@ function TransactionStack(){
   );
 }
 
+function OtherStack(){
+  return(
+    <Stack.Navigator headerMode={false} initialRouteName="Other">
+      <Stack.Screen component={Other} name="Other" />
+      <Stack.Screen component={OtherHistory} name="OtherHistory" />
+      <Stack.Screen component={ChangePassword} name="ChangePassword" />
+    </Stack.Navigator>
+  );
+}
+
 function DrawerTab() {
   return (
     <Drawer.Navigator initialRouteName="Transaction" >
       <Drawer.Screen component={TransactionStack} name="Transaction" options={{
         headerShown: false,
-        drawerLabel: "Transaksi",
+        drawerLabel: "Transaction",
         
       }}/>
       <Drawer.Screen component={TransactionHistory} name="TransactionHistory" options={{
@@ -69,11 +85,14 @@ function DrawerTab() {
       <Drawer.Screen component={MasterItemStack} name="MasterItem" options={{
         headerShown: false,
         drawerLabel: "Master Item"
-      }}/>
-      {/* <Drawer.Screen component={Home} name="Home" /> */}
+      }}/>      
       <Drawer.Screen component={Setting} name="Setting" options={{
         headerShown: false,
         drawerLabel: "Setting"
+      }}/>
+      <Drawer.Screen component={OtherStack} name="Other" options={{
+        headerShown: false,
+        drawerLabel: "Other"
       }}/>
     </Drawer.Navigator>
   );

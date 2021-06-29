@@ -142,7 +142,7 @@ function MasterItemEdit() {
                   setCategoryCode(v)
                 }>
                 {categoryList.map((cat, i)=>(
-                  <Picker.Item key={i} label={cat.name} value={cat.code} />
+                  <Picker.Item style={[_style.listItemHeaderText, {fontSize: 15,}]} key={i} label={cat.name} value={cat.code} />
                 ))}
               </Picker>
             </View>
@@ -189,6 +189,7 @@ const _s = StyleSheet.create({
     paddingHorizontal: 0,
     borderBottomColor: '#eee',
     borderBottomWidth: 1,
+    fontSize: 16,
   },
 });
 

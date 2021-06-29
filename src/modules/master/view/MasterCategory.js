@@ -5,7 +5,6 @@ import {
   FlatList,
   TouchableOpacity,
   ScrollView,
-  StyleSheet,
   TouchableHighlight,
   Alert,
 } from 'react-native';
@@ -17,9 +16,10 @@ import {QUERY_CATEGORY} from '../../../config/StaticQuery';
 import Container from '../../../components/Container';
 import Button from '../../../components/Button';
 import Header from '../../../components/Header';
-import _style from '../../../styles/Typrograhpy';
 import DocumentPicker from 'react-native-document-picker';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
+import _s from '../Styles'
+import _style from '../../../styles';
 
 function MasterCategory() {
   const query = useSelector(state => state.query);
@@ -248,52 +248,5 @@ function MasterCategory() {
     </Container>
   );
 }
-
-const _s = StyleSheet.create({
-  flexRow: {
-    flex: 1,
-    flexDirection: 'row',
-  },
-  headerContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderBottomColor: '#eee',
-    borderBottomWidth: 1,
-    backgroundColor: '#274472',
-  },
-  headerText: {
-    ..._style.listItemHeaderText,
-    color: 'white',
-  },
-  listContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    alignItems: 'center',
-  },
-  listText: {
-    ..._style.bodyText,
-  },
-  categoryDetailContainer: {
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    backgroundColor: '#41729F',
-  },
-  categoryDetailText: {
-    color: 'white',
-    ..._style.listItemHeaderText,
-  },
-  categoryDetailChildContainer: {
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    flexDirection: 'row',
-  },
-  categoryDetailChildText: {
-    ..._style.bodyText,
-  },
-});
 
 export default MasterCategory;

@@ -25,7 +25,7 @@ function Splash() {
             opacity: fade
           },
         ]}>
-        <Text style={_style.h6}>Cashier APP</Text>
+        <Text style={_style.h6}>POS APP</Text>
       </Animated.View>
     </Container>
   );
