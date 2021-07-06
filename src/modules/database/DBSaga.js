@@ -44,7 +44,7 @@ export function runSqlQuery(db, query, params = []) {
       tx.executeSql(
         query,
         params,
-        (tx, results) => {
+        (tx, results) => {                  
           resolve(results)            
         },
         (tx, err) => console.log("error on : ", tx)

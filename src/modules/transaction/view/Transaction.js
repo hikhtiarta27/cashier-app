@@ -7,7 +7,6 @@ import {
   TouchableHighlight,
   Alert,
   TextInput,
-  Dimensions,
   BackHandler,
   ScrollView,
   TouchableOpacity
@@ -21,12 +20,11 @@ import {
 } from '../../../config/StaticQuery';
 import Container from '../../../components/Container';
 import Header from '../../../components/Header';
-import _style from '../../../styles/Typrograhpy';
+import _font from '../../../styles/Typrograhpy';
+import _style from '../../../styles/';
 import {
   useFocusEffect,
   useNavigation,
-  useNavigationState,
-  useRoute,
 } from '@react-navigation/native';
 import {useDispatch, useSelector} from 'react-redux';
 import Button from '../../../components/Button';
@@ -39,12 +37,15 @@ import {
   setHistoryCartListHeader,
 } from '../TransactionAction';
 import AntDesignIcon from 'react-native-vector-icons/AntDesign';
-import {dateTimeToFormat, stringToCurrency} from '../../../util';
+import {dateTimeToFormat, stringToCurrency, currencyToInteger, printInvoice} from '../../../util';
 import Modal from 'react-native-modal';
+import {TextInputMask} from 'react-native-masked-text';
+import { setLoading } from '../../master/MasterAction';
 
 const discountScheme = Yup.object().shape({
   discount: Yup.string()
-    .matches(/^[0-9]+$/, 'Only number')    
+    .matches(/^[0-9]+$/, 'Only number')  
+    .transform(value => value.replace(/[^\d]/g, ''))  
 });
 
 const formList = [
@@ -55,14 +56,12 @@ const formList = [
 ];
 
 function Transaction() {
+  const user = useSelector(state => state.user)
   const query = useSelector(state => state.query);
   const transaction = useSelector(state => state.transaction);
   const db = useSelector(state => state.database);
   const dispatch = useDispatch();
-  const navigation = useNavigation();
-  const navigationStateHistory = useNavigationState(state => state.history);
-  const route = useRoute();
-  const [lastIdInvoice, setLastIdInvoice] = useState(null);
+  const navigation = useNavigation();  
   const [categoryList, setCategoryList] = useState([]);
   const [category, setCategory] = useState({code: '', name: ''});
   const [dataTableFocusCategory, setDataTableFocusCategory] = useState(0);
@@ -70,24 +69,25 @@ function Transaction() {
   const [items, setItems] = useState({});
   const [dataTableFocusItems, setDataTableFocusItems] = useState();
   const [cartUpdateIndex, setCartUpdateIndex] = useState(false);
-  const [cartList, setCartList] = useState([]);
-  const [cartListBck, setCartListBck] = useState([]);
+  const [cartList, setCartList] = useState([]);  
   const [grandTotalDiscount, setGrandTotalDiscount] = useState(0);
+  const [grandTotalPrice, setGrandTotalPrice] = useState(0);
   const [grandTotal, setGrandTotal] = useState(0);
-  const [itemsListBackup, setItemListBackup] = useState([]);
-  const [modalVisible, setModalVisible] = useState(false);
+  const [itemsListBackup, setItemListBackup] = useState([]);  
   const [cartListIndex, setCartListIndex] = useState(null);
   const [discountModal, setDiscountModal] = useState(false);
   const [discountValue, setDiscountValue] = useState(0)
+  const [percentageValue, setPercentageValue] = useState("")
 
   const formik = useFormik({
     initialValues: {
       discount: "",
     },
     validationSchema: discountScheme,
-    onSubmit: async values => {      
-      if (values.discount == "") addDiscount(0)
-      else addDiscount(values.discount)      
+    onSubmit: async values => {           
+      let discount = currencyToInteger(values.discount)       
+      if (discount == 0) addDiscount(0)
+      else addDiscount(discount)      
     },
   });
 
@@ -122,9 +122,9 @@ function Transaction() {
 
   //api call only run once
   useEffect(async () => {
-    await apiGetCategoryList();
+    await apiGetCategoryList();    
     // for query all item
-    // await apiGetItemsListAll();
+    // await apiGetItemsListAll();    
   }, []);
 
   useEffect(async () => {
@@ -185,8 +185,9 @@ function Transaction() {
   );
 
   //get updated data
-  useEffect(async () => {
-    if (!query.fetchQuery) {
+  useEffect(async () => {    
+    
+    if (!query.fetchQuery) {      
       if (query.send.sql == QUERY_CATEGORY.SELECT) {
         let rows = query.res.rows;
         if (rows.length > 0) {
@@ -278,12 +279,14 @@ function Transaction() {
   function calculate(data = null, discount = null) {
     let tmpTotalDiscount = 0;
     let tmpGrandTotal = 0;
+    let tmpTotalPrice = 0
     let tmp = data != null ? data : cartList;
     for (let i = 0; i < tmp.length; i++) {
       tmpTotalDiscount +=
         (tmp[i].discountNew != undefined
           ? tmp[i].discountNew
           : tmp[i].discount) * tmp[i].qty;
+      tmpTotalPrice += tmp[i].qty * (tmp[i].priceNew != undefined ? tmp[i].priceNew : tmp[i].price)
       tmp[i].total =
         tmp[i].qty *
         ((tmp[i].priceNew != undefined ? tmp[i].priceNew : tmp[i].price) -
@@ -293,7 +296,8 @@ function Transaction() {
       tmpGrandTotal += tmp[i].total;
     }    
 
-    // setGrandTotalDiscount(tmpTotalDiscount);        
+    setGrandTotalPrice(tmpTotalPrice);        
+    setGrandTotalDiscount(tmpTotalDiscount);        
     setGrandTotal(tmpGrandTotal - discountValue);
     if(discount != null){
       setGrandTotal(tmpGrandTotal - discount);
@@ -322,7 +326,7 @@ function Transaction() {
       <TouchableHighlight
         key={index}
         style={[
-          _s.listContainer,
+          _style.rowTable,
           dataTableFocusCategory == index ? {backgroundColor: '#eee'} : null,
         ]}
         onPress={() => {
@@ -332,8 +336,8 @@ function Transaction() {
         underlayColor="#eee">
         <>
           {headerTableCategory.map((v, i) => (
-            <View key={i} style={{flex: 1}}>
-              <Text style={_s.listText}>{item[v.key]}</Text>
+            <View key={i} style={_style.flex1}>
+              <Text style={_style.rowTableText}>{item[v.key]}</Text>
             </View>
           ))}
         </>
@@ -343,10 +347,10 @@ function Transaction() {
 
   function categoryHeaderRender() {
     return (
-      <View style={_s.headerContainer}>
+      <View style={_style.headerTable}>
         {headerTableCategory.map((item, index) => (
-          <View key={index} style={{flex: 1}}>
-            <Text style={_s.headerText}>{item.value}</Text>
+          <View key={index} style={_style.flex1}>
+            <Text style={_style.headerTableText}>{item.value}</Text>
           </View>
         ))}
       </View>
@@ -357,7 +361,7 @@ function Transaction() {
     return (
       <TouchableHighlight
         key={index}
-        style={[_s.listContainer]}
+        style={_style.rowTable}
         onPress={() => {
           // setItems(item);
           setDataTableFocusItems(index);
@@ -368,15 +372,15 @@ function Transaction() {
           {headerTableItems.map((v, i) => (
             <View
               key={i}
-              style={{flex: 1, flexDirection: 'row', alignItems: 'center'}}>
-              <View style={{flex: 1}}>
-                <Text style={[_s.listText, _style.listItemHeaderText]}>
+              style={_style.flexRowCenter}>
+              <View style={_style.flex1}>
+                <Text style={[_style.rowTableText, _font.listItemHeaderText]}>
                   {item[v.key]}
                 </Text>
               </View>
               <View style={{alignItems: 'flex-end'}}>
-                <Text style={_s.listText}>{stringToCurrency(item.price)}</Text>
-                <Text style={_s.listText}>
+                <Text style={_style.rowTableText}>{stringToCurrency(item.price)}</Text>
+                <Text style={_style.rowTableText}>
                   {stringToCurrency(item.discount)}
                 </Text>
               </View>
@@ -389,10 +393,10 @@ function Transaction() {
 
   function itemsHeaderRender() {
     return (
-      <View style={_s.headerContainer}>
+      <View style={_style.headerTable}>
         {headerTableItems.map((item, index) => (
-          <View key={index} style={{flex: 1}}>
-            <Text style={_s.headerText}>{item.value}</Text>
+          <View key={index} style={_style.flex1}>
+            <Text style={_style.headerTableText}>{item.value}</Text>
           </View>
         ))}
       </View>
@@ -411,7 +415,7 @@ function Transaction() {
     return (
       <TouchableHighlight
         key={index}
-        style={[_s.listContainer]}
+        style={[_style.rowTable]}
         onPress={() => {
           setCartListIndex(index);
           navigation.navigate('InvoiceEdit', {
@@ -424,32 +428,32 @@ function Transaction() {
           {headerTableCartList.map((v, i) => (
             <View
               key={i}
-              style={{flex: 1, flexDirection: 'row', alignItems: 'center'}}>
+              style={_style.flexRowCenter}>
               {v.key == 'name' ? (
-                <View style={{flex: 1}}>
-                  <Text style={[_s.listText, _style.listItemHeaderText]}>
+                <View style={_style.flex1}>
+                  <Text style={[_style.rowTableText, _font.listItemHeaderText]}>
                     {item.name}
                   </Text>
                 </View>
               ) : null}
               {v.key == 'price' ? (
-                <View style={{flex: 1, alignItems: 'flex-end'}}>
-                  <Text style={_s.listText}>
+                <View style={_style.flexEnd}>
+                  <Text style={_style.rowTableText}>
                     {item.priceNew != undefined
                       ? stringToCurrency(item.priceNew)
                       : stringToCurrency(item.price)}
                   </Text>
-                  <Text style={_s.listText}>{stringToCurrency(item.qty)}</Text>
+                  <Text style={_style.rowTableText}>{stringToCurrency(item.qty)}</Text>
                 </View>
               ) : null}
               {v.key == 'total' ? (
-                <View style={{flex: 1, alignItems: 'flex-end'}}>
-                  <Text style={_s.listText}>
+                <View style={_style.flexEnd}>
+                  <Text style={_style.rowTableText}>
                     {item.discountNew != undefined
                       ? stringToCurrency(item.discountNew)
                       : stringToCurrency(item.discount)}
                   </Text>
-                  <Text style={_s.listText}>
+                  <Text style={_style.rowTableText}>
                     {stringToCurrency(item.total)}
                   </Text>
                 </View>
@@ -463,15 +467,15 @@ function Transaction() {
 
   function cartListHeaderRender() {
     return (
-      <View style={_s.headerContainer}>
+      <View style={_style.headerTable}>
         {headerTableCartList.map((item, index) => (
           <View
             key={index}
             style={[
-              {flex: 1},
+              _style.flex1,
               item.key != 'name' ? {alignItems: 'flex-end'} : null,
             ]}>
-            <Text style={_s.headerText}>{item.value}</Text>
+            <Text style={_style.headerTableText}>{item.value}</Text>
           </View>
         ))}
       </View>
@@ -559,13 +563,13 @@ function Transaction() {
     let today = new Date();
     let currentDateTimeFormatted = dateTimeToFormat(today);
 
-    if (transaction.historyCartListHeader != null) {
-
+    if (transaction.historyCartListHeader != null) {      
       let paramHeader = [];
       paramHeader.push(currentDateTimeFormatted);
       paramHeader.push(discountValue);
       paramHeader.push(grandTotal);
       paramHeader.push(status);
+      paramHeader.push(transaction.historyCartListHeader.flag == 'Y' ? 'E' : 'N');
       paramHeader.push(transaction.historyCartListHeader.id);
 
       await apiUpdateToTrxHeader(paramHeader);
@@ -590,20 +594,26 @@ function Transaction() {
         paramDetail.push(x.qty);
         paramDetail.push(x.total);
         paramDetail.push(currentDateTimeFormatted);
+        paramDetail.push(user.store.id);
+        paramDetail.push(user.store.name);
+        paramDetail.push('N');
         await apiInsertToTrxDetail(paramDetail);
       }      
 
       dispatch(setHistoryCartList(null));
       dispatch(setHistoryCartListHeader(null));
       navigation.goBack();
-    } else {
+    } else {      
       let paramHeader = [];
       paramHeader.push(currentDateTimeFormatted);
       paramHeader.push(discountValue);
       paramHeader.push(grandTotal);
       paramHeader.push(status);
       paramHeader.push(currentDateTimeFormatted);
-      await apiInsertToTrxHeader(paramHeader);
+      paramHeader.push(user.store.id);
+      paramHeader.push(user.store.name);
+      paramHeader.push('N');
+      await apiInsertToTrxHeader(paramHeader);      
 
       let lastId = await apiGetLastIdTrxHeader();
       lastId = lastId.rows.item(0).id;
@@ -625,11 +635,39 @@ function Transaction() {
         );
         paramDetail.push(cartList[i].qty);
         paramDetail.push(cartList[i].total);
-        paramDetail.push(currentDateTimeFormatted);        
-        await apiInsertToTrxDetail(paramDetail);
+        paramDetail.push(currentDateTimeFormatted);  
+        paramDetail.push(user.store.id);
+        paramDetail.push(user.store.name);
+        paramDetail.push('N');            
+        // await apiInsertToTrxDetail(paramDetail);        
+        apiInsertToTrxDetail(paramDetail);        
       }
     }
+
+    if(status == 'BAYAR') {
+      await print(currentDateTimeFormatted)
+    }
+
     clearCartList();
+  }
+
+  async function print(date){    
+    dispatch(setLoading(true))
+    let data = {
+      storeName: user.store.name,
+      date,
+      discount: discountValue,
+      grandTotal: grandTotal,
+      discountItem : grandTotalDiscount,
+      priceItem: grandTotalPrice,
+    }    
+    try {
+      await printInvoice(data, cartList)    
+      dispatch(setLoading(false))
+    } catch (error) {
+      dispatch(setLoading(false))
+      Alert.alert("Error", "Printer not connected")
+    }
   }
 
   function apiGetLastIdTrxHeader() {
@@ -668,6 +706,7 @@ function Transaction() {
           onPress: async () => {
             let param = [];
             param.push('HAPUS');
+            param.push('E');
             param.push(transaction.historyCartListHeader.id);
             await apiUpdateStatus(param);
             Alert.alert('Information', 'Transaction successfully deleted!', [
@@ -711,6 +750,18 @@ function Transaction() {
     // formik.resetForm()
   }
 
+  function calculatePercentage(text){
+    if(text.length > 0){
+      let v = parseInt(text)
+      let discount = v / 100 * (grandTotal + discountValue);
+      formik.setFieldValue("discount", discount.toString())
+    }else{
+      formik.setFieldValue("discount", "")
+    }
+
+    setPercentageValue(text)
+  }
+
   return (
     <Container>
       {transaction.historyCartListHeader != null ? (
@@ -723,12 +774,12 @@ function Transaction() {
           submitBtnFunc={hapusInvoice}
         />
       ) : (
-        <Header drawerBtn name="Transaction" />
+        <Header drawerBtn syncBtn name="Transaction" />
       )}
       <View style={_s.menuBarContainer}>
-        <View style={{flex: 1}}>
+        <View style={_style.flex1}>
           <TextInput
-            style={_s.searchField}
+            style={_style.searchField}
             placeholder="Search..."
             onChangeText={text => searchText(text)}
           />
@@ -741,8 +792,8 @@ function Transaction() {
           </View>
         ) : null}
       </View>
-      <View style={_s.flexRow}>
-        <View style={{flex: 1, borderRightColor: '#eee', borderRightWidth: 3}}>
+      <View style={_style.flexRow}>
+        <View style={[_style.flex1, _style.tableSeparator]}>
           <FlatList
             ListHeaderComponent={categoryHeaderRender}
             showsVerticalScrollIndicator={false}
@@ -753,7 +804,7 @@ function Transaction() {
             stickyHeaderIndices={[0]}
           />
         </View>
-        <View style={{flex: 2, borderRightColor: '#eee', borderRightWidth: 3}}>
+        <View style={[_style.flex2, _style.tableSeparator]}>
           <FlatList
             ListHeaderComponent={itemsHeaderRender}
             showsVerticalScrollIndicator={false}
@@ -764,7 +815,7 @@ function Transaction() {
             stickyHeaderIndices={[0]}
           />
         </View>
-        <View style={{flex: 2}}>
+        <View style={_style.flex2}>
           <FlatList
             ListHeaderComponent={cartListHeaderRender}
             showsVerticalScrollIndicator={false}
@@ -775,41 +826,34 @@ function Transaction() {
             stickyHeaderIndices={[0]}
           />
           <View
-            style={[
-              _s.totalHeaderContainer,
-              {borderTopColor: '#eee', borderTopWidth: 3, paddingTop: 10},
-            ]}>
-            <View style={{flex: 1}}>
-              <Text style={_s.totalHeaderText}>Discount</Text>
+            style={_s.totalHeaderBorder}>
+            <View style={_style.flex1}>
+              <Text style={_style.totalHeaderText}>Discount</Text>
             </View>
             <TouchableOpacity onPress={() => setDiscountModal(true)} disabled={cartList.length == 0 ? true : false}>
-              <Text style={_s.totalHeaderText}>{discountValue == 0 ? "Add Discount" : stringToCurrency(discountValue)}</Text>
+              <Text style={_style.totalHeaderText}>{discountValue == 0 ? "Add Discount" : stringToCurrency(discountValue)}</Text>
             </TouchableOpacity>
           </View>
-          <View style={_s.totalHeaderContainer}>
-            <View style={{flex: 1}}>
-              <Text style={[_s.totalHeaderText, {fontSize: 20}]}>Total</Text>
+          <View style={_style.totalHeaderContainer}>
+            <View style={_style.flex1}>
+              <Text style={[_style.totalHeaderText, {fontSize: 20}]}>Total</Text>
             </View>
             <View>
-              <Text style={[_s.totalHeaderText, {fontSize: 20}]}>
+              <Text style={[_style.totalHeaderText, {fontSize: 20}]}>
                 {stringToCurrency(grandTotal)}
               </Text>
             </View>
           </View>
           {cartList.length > 0 && (
-            <View style={{flexDirection: 'row'}}>
+            <View style={_style.rowDirection}>
               <View
-                style={{
-                  flex: 1,
-                  borderRightColor: '#eee',
-                  borderRightWidth: 3,
-                }}>
+                style={[_style.flex1, _style.tableSeparator]}>
                 <Button
                   btnText="Bayar & Print"
                   onPress={() => showAlertBayarAndSimpan('BAYAR')}
                 />
               </View>
-              <View style={{flex: 1}}>
+              <View style={_style.flex1}>
                 <Button
                   btnText="Simpan"
                   onPress={() => showAlertBayarAndSimpan('SIMPAN')}
@@ -822,53 +866,65 @@ function Transaction() {
 
       <Modal
         isVisible={discountModal}
-        style={{margin: 1}}
+        style={_style.margin0}
         onBackdropPress={cancelDiscount}
         onBackButtonPress={cancelDiscount}>
-        <View style={{flex: 1, backgroundColor: 'white'}}>
+        <View style={[_style.flex1, _style.bgWhite]}>
           <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              paddingHorizontal: 15,
-              paddingTop: 15,
-            }}>
+            style={[_style.rowDirectionCenter, _style.px15, _style.pt15]}>
             <TouchableOpacity onPress={cancelDiscount}>
               <AntDesignIcon
                 name="close"
                 size={25}
                 color="black"
-                style={{marginRight: 5}}
+                style={_style.mr5}
               />
             </TouchableOpacity>
-            <View style={{flex: 1}}>
-              <Text style={_s.modalHeader}>Add Discount</Text>
+            <View style={_style.flex1}>
+              <Text style={_style.modalHeader}>Add Discount</Text>
             </View>
           </View>
-          <View style={{flex: 1, marginTop: 15,}}>
+          <View style={[_style.flex1, _style.mt15]}>
             <ScrollView>
               {formList.map((item, index) => (
-                <View style={_s.fieldContainer} key={index}>
-                  <Text style={_s.fieldHeaderText}>{item.value}</Text>
-                  <View style={{marginHorizontal: 10}}>
-                    <TextInput                      
-                      style={_s.fieldText}
-                      contextMenuHidden={true}
+                <View style={_style.fieldContainer} key={index}>
+                  <Text style={_style.fieldHeaderText}>{item.value}</Text>
+                  <View style={_style.mx10}>
+                    <TextInputMask
+                      style={_style.fieldText}
                       key={index}
-                      onChangeText={formik.handleChange(item.key)}
+                      type={'money'}                    
+                      options={{
+                        precision: 0,
+                        separator: '.',
+                        delimiter: ',',
+                        unit: '',
+                        suffixUnit: '',
+                      }}                      
+                      onChangeText={(e)=>{
+                        formik.setFieldValue(item.key, e)
+                        setPercentageValue("")
+                      }}
                       onBlur={formik.handleBlur(item.key)}
                       value={formik.values[item.key]}
-                      clearButtonMode="while-editing"
-                      returnKeyType="done"                 
-                      keyboardType="numeric"     
-                      onSubmitEditing={formik.handleSubmit}
                     />
                     {formik.errors[item.key] && formik.touched[item.key] ? (
                       <ErrorText text={formik.errors[item.key]} />
                     ) : null}
                   </View>
                 </View>
-              ))}              
+              ))}   
+              <View style={_style.fieldContainer}>
+                <Text style={_style.fieldHeaderText}>Percentage</Text>
+                <View style={_style.mx10}>
+                  <TextInput
+                    keyboardType="number-pad"
+                    style={_style.fieldText}
+                    value={percentageValue}
+                    onChangeText={(text) => calculatePercentage(text)}
+                  />
+                </View>                
+              </View>              
             </ScrollView>
           </View>
           <View>
@@ -880,33 +936,13 @@ function Transaction() {
   );
 }
 
-const _s = StyleSheet.create({
-  flexRow: {
-    flex: 1,
+const _s = StyleSheet.create({  
+  totalHeaderBorder:{
     flexDirection: 'row',
-  },
-  headerContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderBottomColor: '#eee',
-    borderBottomWidth: 1,
-    backgroundColor: '#274472',
-  },
-  headerText: {
-    ..._style.listItemHeaderText,
-    color: 'white',
-  },
-  listContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    paddingVertical: 10,
-    paddingHorizontal: 10,
     alignItems: 'center',
-  },
-  listText: {
-    ..._style.bodyText,
+    paddingHorizontal: 10,
+    marginBottom: 10,
+    borderTopColor: '#eee', borderTopWidth: 3, paddingTop: 10
   },
   totalHeaderContainer: {
     flexDirection: 'row',
@@ -921,58 +957,11 @@ const _s = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 10,
     marginVertical: 10,
-  },
-  searchField: {
-    marginVertical: 0,
-    paddingVertical: 0,
-  },
+  },  
   hapusSemuaText: {
     color: '#5395B5',
     ..._style.listItemHeaderText,
-  },
-  filterContainer: {
-    flexDirection: 'row',
-    margin: 10,
-    alignItems: 'center',
-  },
-  filterBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: '#eee',
-    borderRadius: 10,
-    marginRight: 8,
-  },
-  filterText: {
-    ..._style.bodyText,
-    textTransform: 'capitalize',
-  },
-  filterHeader: {
-    ..._style.listItemHeaderText,
-    textTransform: 'capitalize',
-    marginTop: 25,
-  },
-  modalHeader: {
-    ..._style.listItemHeaderText,
-    fontSize: 20,
-    marginLeft: 8,
-  },
-  fieldContainer: {
-    paddingHorizontal: 10,
-    marginVertical: 10,
-  },
-  fieldHeaderText: {
-    ..._style.bodyText,
-    paddingHorizontal: 10,
-    color: '#888',
-  },
-  fieldText: {
-    ..._style.listItemHeaderText,
-    paddingHorizontal: 0,
-    borderBottomColor: '#eee',
-    borderBottomWidth: 1,
-    fontSize: 16,
-  },
+  },  
 });
 
 export default Transaction;

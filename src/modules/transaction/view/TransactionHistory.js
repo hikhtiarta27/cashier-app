@@ -15,7 +15,8 @@ import {QUERY_TRX_DETAIL, QUERY_TRX_HEADER} from '../../../config/StaticQuery';
 import Container from '../../../components/Container';
 import Button from '../../../components/Button';
 import Header from '../../../components/Header';
-import _style from '../../../styles/Typrograhpy';
+import _font from '../../../styles/Typrograhpy';
+import _style from '../../../styles/';
 import {
   useFocusEffect,
   useNavigation,
@@ -28,12 +29,13 @@ import {
 import {dateToFormat, stringToCurrency} from '../../../util';
 import AntDesignIcon from 'react-native-vector-icons/AntDesign';
 import {runSqlQuery} from '../../database/DBSaga';
-import Modal from 'react-native-modal'
+import Modal from 'react-native-modal';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import {dateTimeToFormat} from '../../../util'
-
+import {dateTimeToFormat, printInvoice, apiRequestAxios} from '../../../util';
+import {setLoading} from '../../master/MasterAction';
 
 function TransactionHistory() {
+  const user = useSelector(state => state.user);
   const db = useSelector(state => state.database);
   const query = useSelector(state => state.query);
   const route = useRoute();
@@ -44,20 +46,25 @@ function TransactionHistory() {
   const [cartList, setCartList] = useState([]);
   const [dataTableFocus, setDataTableFocus] = useState(0);
   const [filterItemFocus, setFilterItemFocus] = useState(0);
-  const [filterItemModalFocus, setFilterItemModalFocus] = useState(filterItemFocus);
+  const [filterItemModalFocus, setFilterItemModalFocus] =
+    useState(filterItemFocus);
   const [filterStatusFocus, setFilterStatusFocus] = useState(0);
-  const [filterStatusFocusPrev, setFilterStatusFocusPrev] = useState(filterStatusFocus);
-  const [filterVisible, setFilterVisible] = useState(false)
+  const [filterStatusFocusPrev, setFilterStatusFocusPrev] =
+    useState(filterStatusFocus);
+  const [filterVisible, setFilterVisible] = useState(false);
 
-  const [dateFilter, setDateFilter] = useState(new Date()); 
+  const [dateFilter, setDateFilter] = useState(new Date());
   const [dateFilterPrev, setDateFilterPrev] = useState(dateFilter);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [isDateFilter, setIsDateFilter] = useState(false)
-  const [counterFilter,setCounterFilter] = useState(0)
-  const [refreshCartList, setRefreshCartList] = useState(false)
+  const [isDateFilter, setIsDateFilter] = useState(false);
+  const [counterFilter, setCounterFilter] = useState(0);
+  const [refreshCartList, setRefreshCartList] = useState(false);
+
+  const [trxHeaderList, setTrxHeaderList] = useState([]);
+  const [trxDetailList, setTrxDetailList] = useState([]);
 
   const filterItem = ['Hari ini', 'Kemarin', '1 Minggu Terakhir'];
-  const filterStatus = ['Semua', 'Simpan', 'Hapus', "Void"];
+  const filterStatus = ['Semua', 'Simpan', 'Hapus', 'Bayar', 'Void'];
 
   const headerTable = [
     {
@@ -65,7 +72,7 @@ function TransactionHistory() {
       value: 'Trx No',
     },
     {
-      key: 'date',
+      key: 'created_date',
       value: 'Trx Date',
     },
     {
@@ -105,157 +112,217 @@ function TransactionHistory() {
     },
   ];
 
-  function apiGetHistoryList(param) {
-    dispatch(
-      queryFetch({
-        sql: QUERY_TRX_HEADER.SELECT,
-        param,
-      }),
-    );
+  //--------------------UPLOAD
+
+  useEffect(async () => {
+    if (trxHeaderList.length != 0) {
+      await apiRequestAxios(
+        user.store.api_url + '/transactionHeader/batch',
+        'POST',
+        {data: trxHeaderList},
+      ).then(res => {});
+      await dispatch(
+        queryFetch({
+          sql: QUERY_TRX_HEADER.UPDATE_FLAG_Y_ALL,
+        }),
+      );
+    }
+  }, [trxHeaderList]);
+
+  useEffect(async () => {
+    if (trxDetailList.length != 0) {
+      await apiRequestAxios(
+        user.store.api_url + '/transactionDetail/batch',
+        'POST',
+        {data: trxDetailList},
+      ).then(res => {});
+      await dispatch(
+        queryFetch({
+          sql: QUERY_TRX_DETAIL.UPDATE_FLAG_Y_ALL,
+        }),
+      );
+    }
+  }, [trxDetailList]);
+
+  async function syncFunc() {
+    // await dispatch(setLoading(true));
+    await getTrxHeaderList();
+    await getTrxDetailList();
   }
+
+  async function getTrxHeaderList() {
+    let result = await runSqlQuery(db.database, QUERY_TRX_HEADER.SELECT_ALL);
+    let rows = result.rows;
+    if (rows.length > 0) {
+      let resultList = [];
+      for (let i = 0; i < rows.length; i++) {
+        if (rows.item(i).flag == 'Y') continue;
+        await resultList.push(rows.item(i));
+      }
+      console.log("Header List: ")
+      console.log(resultList)
+      setTrxHeaderList(resultList);
+    }
+  }
+
+  async function getTrxDetailList() {
+    let result = await runSqlQuery(db.database, QUERY_TRX_DETAIL.SELECT_ALL);
+    let rows = result.rows;
+    if (rows.length > 0) {
+      let resultList = [];
+      for (let i = 0; i < rows.length; i++) {
+        if (rows.item(i).flag == 'Y') continue;
+        await resultList.push(rows.item(i));
+      }
+      setTrxDetailList(resultList);
+    }
+  }
+
+  //--------------------UPLOAD
 
   //api call only run once
   useEffect(async () => {
     // await apiGetHistoryList();
+    console.log("Run once")
+    // await syncFunc();
     await runApiGetByDate();
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      // const unsubscribe = apiGetHistoryList();
-      const unsubscribe = runApiGetByDate();      
-      setFilterItemFocus(0)
-      setFilterStatusFocus(0)
-      setFilterStatusFocusPrev(0)
-      return () => unsubscribe;
-    }, []),
-  );
+      console.log("On focus")      
+      const unsubscribe = syncFunc();
+      const unsubscribe1 = runApiGetByDate();
+      setFilterItemFocus(0);
+      setFilterStatusFocus(0);
+      setFilterStatusFocusPrev(0);
+      return () =>  {
+        unsubscribe,
+        unsubscribe1
+      };      
+    }, []),  
+  );  
 
-  useEffect(async () => {    
+  useEffect(async () => {
     if (history.id != undefined) {
       let param = [];
-      param.push(history.ref_void_id != null ? history.ref_void_id : history.id);    
+      param.push(
+        history.ref_void_id != null ? history.ref_void_id : history.id,
+      );
       await apiGetTrxDetail(param);
     }
   }, [history.id, refreshCartList]);
 
-  useEffect(async () => {    
+  useEffect(async () => {
     await runApiGetByDate();
-    setFilterItemModalFocus(filterItemFocus)
+    setFilterItemModalFocus(filterItemFocus);
   }, [filterItemFocus, filterStatusFocusPrev, dateFilterPrev]);
 
-  function runApiGetByDate() {
+  async function runApiGetByDate() {
     let today = new Date();
 
     if (filterItem[filterItemFocus] == 'Kemarin') {
-      today.setDate(today.getDate() - 1);      
+      today.setDate(today.getDate() - 1);
     }
 
     if (filterItem[filterItemFocus] == '1 Minggu Terakhir') {
-      today.setDate(today.getDate() - 7);      
+      today.setDate(today.getDate() - 7);
     }
 
-    let currentDateTimeFormatted = dateToFormat(isDateFilter ? dateFilterPrev : today)
+    let currentDateTimeFormatted = dateToFormat(
+      isDateFilter ? dateFilterPrev : today,
+    );
 
     let param = [];
-    param.push(currentDateTimeFormatted); 
-    param.push(filterStatusFocus != 0 ? `%${filterStatus[filterStatusFocus].toUpperCase()}%` : '%%')
+    param.push(currentDateTimeFormatted);
+    param.push(
+      filterStatusFocus != 0
+        ? `%${filterStatus[filterStatusFocus].toUpperCase()}%`
+        : '%%',
+    );
     if (filterItem[filterItemFocus] == '1 Minggu Terakhir') {
-      let param = []
+      let param = [];
       let tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
-      param.push(currentDateTimeFormatted); 
-      param.push(dateToFormat(tomorrow))
-      param.push(filterStatusFocus != 0 ? `%${filterStatus[filterStatusFocus].toUpperCase()}%` : '%%')        
-      apiGetByDateBetween(param);
-    }else{
-      apiGetByDate(param);
-    }            
-    // if(filterStatusFocus != 0 && filterItemFocus != 0) setCounterFilter(1)
-    // else if(filterStatusFocus == 0 && filterItemFocus == 0) setCounterFilter(0)
-    // else setCounterFilter(2)
+      param.push(currentDateTimeFormatted);
+      param.push(dateToFormat(tomorrow));
+      param.push(
+        filterStatusFocus != 0
+          ? `%${filterStatus[filterStatusFocus].toUpperCase()}%`
+          : '%%',
+      );
+      await apiGetByDateBetween(param);
+    } else {
+      await apiGetByDate(param);
+    }
 
-    if(filterStatusFocus != 0) setCounterFilter(1)    
+    if (filterStatusFocus != 0) setCounterFilter(1);
 
-    if(filterItemFocus != 0) setCounterFilter(1)    
+    if (filterItemFocus != 0) setCounterFilter(1);
 
-    if(filterItemFocus == 0 && filterStatusFocus == 0) setCounterFilter(0)
-    if(filterItemFocus != 0 && filterStatusFocus != 0) setCounterFilter(2)
-    // else {
-    //   let param = []
-    //   param.push(filterStatusFocus != 0 ? `%${filterStatus[filterStatusFocus].toUpperCase()}%` : '%%')      
-    //   apiGetHistoryList(param);         
-    //   if(filterStatusFocus == 0) setCounterFilter(counterFilter - 1)
-    //   else setCounterFilter(1)
-    // }    
+    if (filterItemFocus == 0 && filterStatusFocus == 0) setCounterFilter(0);
+    if (filterItemFocus != 0 && filterStatusFocus != 0) setCounterFilter(2);
   }
 
   function apiGetTotalItemByRefVoidId(param) {
-    return runSqlQuery(db.database, QUERY_TRX_DETAIL.SELECT_TOTAL_ITEMS_BY_TRX_HEADER_ID, param);
+    return runSqlQuery(
+      db.database,
+      QUERY_TRX_DETAIL.SELECT_TOTAL_ITEMS_BY_TRX_HEADER_ID,
+      param,
+    );
   }
 
   //get updated data
-  useEffect(async() => {
-    if(!query.fetchQuery){
-      if (query.send.sql == QUERY_TRX_HEADER.SELECT) {
-      let rows = query.res.rows;
-      if (rows.length > 0) {
-        let resultList = [];
-        for (let i = 0; i < rows.length; i++) {
-          if(rows.item(i).ref_void_id != null){
-            let param = []
-            param.push(rows.item(i).ref_void_id)
-            let totalItem = await apiGetTotalItemByRefVoidId(param)
-            rows.item(i).total_item = totalItem.rows.item(0).total_item;
+  useEffect(async () => {
+    if (!query.fetchQuery) {
+      if (
+        query.send.sql == QUERY_TRX_HEADER.SELECT_BY_DATE ||
+        query.send.sql == QUERY_TRX_HEADER.SELECT_BY_DATE_BETWEEN
+      ) {
+        let rows = query.res.rows;
+        if (rows.length > 0) {
+          let resultList = [];
+          for (let i = 0; i < rows.length; i++) {
+            if (rows.item(i).ref_void_id != null) {
+              let param = [];
+              param.push(rows.item(i).ref_void_id);
+              let totalItem = await apiGetTotalItemByRefVoidId(param);
+              rows.item(i).total_item = totalItem.rows.item(0).total_item;
+            }
+            resultList.push(rows.item(i));
           }
-          resultList.push(rows.item(i));
+          setHistory(resultList[0]);
+          setRefreshCartList(!refreshCartList);
+          setHistoryList(resultList);
+          setDataTableFocus(0);
+        } else {
+          setCartList([]);
+          setHistory({});
+          setHistoryList([]);
         }
-        setHistory(resultList[0]);
-        setHistoryList(resultList);
-        setDataTableFocus(0);
-      } else {
-        setCartList([]);
-        setHistory({});
-        setHistoryList([]);
       }
-    }
 
-    if (query.send.sql == QUERY_TRX_HEADER.SELECT_BY_DATE || query.send.sql == QUERY_TRX_HEADER.SELECT_BY_DATE_BETWEEN) {
-      let rows = query.res.rows;
-      if (rows.length > 0) {
-        let resultList = [];
-        for (let i = 0; i < rows.length; i++) {
-          if(rows.item(i).ref_void_id != null){
-            let param = []
-            param.push(rows.item(i).ref_void_id)
-            let totalItem = await apiGetTotalItemByRefVoidId(param)
-            rows.item(i).total_item = totalItem.rows.item(0).total_item;
+      if (query.send.sql == QUERY_TRX_DETAIL.SELECT_BY_TRX_HEADER_ID) {
+        let rows = query.res.rows;
+        if (rows.length > 0) {
+          let resultList = [];
+          for (let i = 0; i < rows.length; i++) {
+            resultList.push(rows.item(i));
           }
-          resultList.push(rows.item(i));          
-        }        
-        setHistory(resultList[0]);
-        setRefreshCartList(!refreshCartList)
-        setHistoryList(resultList);
-        setDataTableFocus(0);        
-      } else {
-        setCartList([]);
-        setHistory({});
-        setHistoryList([]);
-      }
-    }
-
-    if (query.send.sql == QUERY_TRX_DETAIL.SELECT_BY_TRX_HEADER_ID) {
-      let rows = query.res.rows;
-      if (rows.length > 0) {
-        let resultList = [];
-        for (let i = 0; i < rows.length; i++) {
-          resultList.push(rows.item(i));
+          setCartList(resultList);
+        } else {
+          setCartList([]);
         }
-        setCartList(resultList);
-      } else {
-        setCartList([]);
       }
-    }
+      //-------UPLOAD
+      // if (query.send.sql == QUERY_TRX_DETAIL.UPDATE_FLAG_Y_ALL) {
+      //   await dispatch(setLoading(false));
+      // }
+
+      // if (query.send.sql == QUERY_TRX_HEADER.UPDATE_FLAG_Y_ALL) {
+      //   await dispatch(setLoading(false));
+      // }
+      //-------UPLOAD
     }
   }, [query.fetchQuery]);
 
@@ -282,6 +349,7 @@ function TransactionHistory() {
           onPress: async () => {
             let param = [];
             param.push('HAPUS');
+            param.push('E');
             param.push(history.id);
             await apiUpdateStatus(param);
             await runApiGetByDate();
@@ -333,11 +401,12 @@ function TransactionHistory() {
           onPress: async () => {
             let param = [];
             param.push('VOID');
+            param.push('E');
             param.push(history.id);
             await apiUpdateStatus(param);
 
-            let today = new Date();            
-            let currentDateTimeFormatted = dateTimeToFormat(today)
+            let today = new Date();
+            let currentDateTimeFormatted = dateTimeToFormat(today);
 
             let discount =
               parseInt(history.discount) - parseInt(history.discount) * 2;
@@ -351,8 +420,11 @@ function TransactionHistory() {
             paramHeader.push('VOID');
             paramHeader.push(history.id);
             paramHeader.push(currentDateTimeFormatted);
+            paramHeader.push(user.store.id);
+            paramHeader.push(user.store.name);
+            paramHeader.push('N');
             await apiInsertToTrxHeaderVoid(paramHeader);
-            await runApiGetByDate()
+            await runApiGetByDate();
             Alert.alert('Information', 'Transaction successfully voided!', [
               {
                 text: 'Ok',
@@ -392,7 +464,7 @@ function TransactionHistory() {
       <TouchableHighlight
         key={index}
         style={[
-          _s.listContainer,
+          _style.rowTable,
           dataTableFocus == index ? {backgroundColor: '#eee'} : null,
         ]}
         onPress={() => {
@@ -401,9 +473,9 @@ function TransactionHistory() {
         }}
         underlayColor="#eee">
         <>
-          {headerTable.map((v, i) => (            
-            <View key={i} style={{flex: 1}}>                            
-              <Text style={_s.listText}>
+          {headerTable.map((v, i) => (
+            <View key={i} style={_style.flex1}>
+              <Text style={_style.rowTableText}>
                 {v.key == 'discount' ||
                 v.key == 'grand_total' ||
                 v.key == 'total_item'
@@ -419,10 +491,10 @@ function TransactionHistory() {
 
   function historyHeaderRender() {
     return (
-      <View style={_s.headerContainer}>
+      <View style={_style.headerTable}>
         {headerTable.map((item, index) => (
-          <View key={index} style={{flex: 1}}>
-            <Text style={_s.headerText}>{item.value}</Text>
+          <View key={index} style={_style.flex1}>
+            <Text style={_style.headerTableText}>{item.value}</Text>
           </View>
         ))}
       </View>
@@ -431,25 +503,27 @@ function TransactionHistory() {
 
   function dataRenderCartList({item, index}) {
     return (
-      <View key={index} style={[_s.listContainer]}>
+      <View key={index} style={[_style.rowTable]}>
         <>
           {headerTableCartList.map((v, i) => (
             <View
               key={i}
-              style={{flex: 1, flexDirection: 'row', alignItems: 'center'}}>
+              style={_style.flexRowCenter}>
               {v.key == 'name' ? (
-                <View style={{flex: 1}}>
-                  <Text style={[_s.listText, _style.listItemHeaderText]}>{item.item_name}</Text>
+                <View style={_style.flex1}>
+                  <Text style={[_style.rowTableText, _font.listItemHeaderText]}>
+                    {item.item_name}
+                  </Text>
                 </View>
               ) : null}
               {v.key == 'price' ? (
-                <View style={{flex: 1, alignItems: 'flex-end'}}>
-                  <Text style={_s.listText}>
+                <View style={_style.flexEnd}>
+                  <Text style={_style.rowTableText}>
                     {item.priceNew != undefined
                       ? stringToCurrency(item.priceNew)
                       : stringToCurrency(item.price)}
                   </Text>
-                  <Text style={_s.listText}>                    
+                  <Text style={_style.rowTableText}>
                     {history.ref_void_id != null
                       ? `-${stringToCurrency(item.quantity)}`
                       : stringToCurrency(item.quantity)}
@@ -457,13 +531,13 @@ function TransactionHistory() {
                 </View>
               ) : null}
               {v.key == 'total' ? (
-                <View style={{flex: 1, alignItems: 'flex-end'}}>                  
-                  <Text style={_s.listText}>
+                <View style={_style.flexEnd}>
+                  <Text style={_style.rowTableText}>
                     {item.discountNew != undefined
                       ? stringToCurrency(item.discountNew)
-                      : stringToCurrency(item.discount) }                      
+                      : stringToCurrency(item.discount)}
                   </Text>
-                  <Text style={_s.listText}>
+                  <Text style={_style.rowTableText}>
                     {history.ref_void_id != null
                       ? `-${stringToCurrency(item.total)}`
                       : stringToCurrency(item.total)}
@@ -479,58 +553,95 @@ function TransactionHistory() {
 
   function cartListHeaderRender() {
     return (
-      <View style={_s.headerContainer}>
+      <View style={_style.headerTable}>
         {headerTableCartList.map((item, index) => (
           <View
             key={index}
             style={[
-              {flex: 1},
+              _style.flex1,
               item.key != 'name' ? {alignItems: 'flex-end'} : null,
             ]}>
-            <Text style={_s.headerText}>{item.value}</Text>
+            <Text style={_style.headerTableText}>{item.value}</Text>
           </View>
         ))}
       </View>
     );
   }
 
-  function handleDatePicker(event, selectedDate){    
-    if(event.type == 'set'){
-      setIsDateFilter(true)
-      setFilterItemModalFocus(99)
-      setDateFilter(event.nativeEvent.timestamp)
+  function handleDatePicker(event, selectedDate) {
+    if (event.type == 'set') {
+      setIsDateFilter(true);
+      setFilterItemModalFocus(99);
+      setDateFilter(event.nativeEvent.timestamp);
     }
-    setShowDatePicker(false)     
+    setShowDatePicker(false);
   }
 
-  async function handleFilter(){
-    await setFilterItemFocus(filterItemModalFocus)    
-    await setFilterStatusFocusPrev(filterStatusFocus)
-    await setFilterVisible(!filterVisible)
-    await setDateFilterPrev(dateFilter)
+  async function handleFilter() {
+    await setFilterItemFocus(filterItemModalFocus);
+    await setFilterStatusFocusPrev(filterStatusFocus);
+    await setFilterVisible(!filterVisible);
+    await setDateFilterPrev(dateFilter);
 
-    if(filterItemModalFocus != 0 && filterStatusFocus != 0){
-      setCounterFilter(2)
-    }else if(filterItemModalFocus == 0 && filterStatusFocus == 0){    
-      setCounterFilter(0)
-    }else if(filterItemModalFocus != 0 || filterStatusFocus != 0){      
-      setCounterFilter(1)
+    if (filterItemModalFocus != 0 && filterStatusFocus != 0) {
+      setCounterFilter(2);
+    } else if (filterItemModalFocus == 0 && filterStatusFocus == 0) {
+      setCounterFilter(0);
+    } else if (filterItemModalFocus != 0 || filterStatusFocus != 0) {
+      setCounterFilter(1);
     }
-    
   }
 
-  function cancelFilter(){
-    setIsDateFilter(false)
-    setFilterItemModalFocus(filterItemFocus)
-    setFilterStatusFocus(filterStatusFocusPrev)
-    setFilterVisible(!filterVisible)
+  function cancelFilter() {
+    setIsDateFilter(false);
+    setFilterItemModalFocus(filterItemFocus);
+    setFilterStatusFocus(filterStatusFocusPrev);
+    setFilterVisible(!filterVisible);
+  }
+
+  function cartListCalculate() {
+    let tmpTotalDiscount = 0;
+    let tmpTotalPrice = 0;
+    let tmp = cartList;
+
+    for (let i = 0; i < tmp.length; i++) {
+      tmpTotalDiscount += tmp[i].discount;
+      tmpTotalPrice += tmp[i].price * tmp[i].quantity;
+    }
+
+    return {
+      tmpTotalDiscount,
+      tmpTotalPrice,
+    };
+  }
+
+  async function rePrint() {
+    dispatch(setLoading(true));
+
+    let res = await cartListCalculate();
+
+    let data = {
+      storeName: history.store_name,
+      date: history.date,
+      discount: history.discount,
+      grandTotal: history.grand_total,
+      discountItem: res.tmpTotalDiscount,
+      priceItem: res.tmpTotalPrice,
+    };
+    try {
+      await printInvoice(data, cartList);
+      dispatch(setLoading(false));
+    } catch (error) {
+      dispatch(setLoading(false));
+      Alert.alert('Error', 'Printer not connected');
+    }
   }
 
   return (
     <Container>
       <Header drawerBtn={true} name="Transaction History" />
       {showDatePicker && (
-        <DateTimePicker                
+        <DateTimePicker
           value={dateFilter}
           mode={'date'}
           is24Hour={true}
@@ -538,113 +649,137 @@ function TransactionHistory() {
           onChange={handleDatePicker}
         />
       )}
-      <Modal isVisible={filterVisible} style={{margin: 1,}}
+      <Modal
+        isVisible={filterVisible}
+        style={_style.margin0}
         onBackdropPress={cancelFilter}
-        onBackButtonPress={cancelFilter}
-      >
-        <View style={{flex:1, backgroundColor: "white"}}>
-          <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 15, paddingTop: 15, }}>
+        onBackButtonPress={cancelFilter}>
+        <View style={[_style.flex1, _style.bgWhite]}>
+          <View
+            style={[_style.rowDirectionCenter, _style.px15, _style.pt15]}>
             <TouchableOpacity onPress={cancelFilter}>
               <AntDesignIcon
                 name="close"
                 size={25}
                 color="black"
-                style={{marginRight: 5}}
+                style={_style.mr5}
               />
             </TouchableOpacity>
-            <View style={{flex: 1,}}>
-              <Text style={_s.modalHeader}>Filter</Text>
+            <View style={_style.flex1}>
+              <Text style={_style.modalHeader}>Filter</Text>
             </View>
-            {(isDateFilter || filterStatusFocus || filterItemFocus != 0) && <TouchableOpacity onPress={()=>{
-              setIsDateFilter(false)
-              setFilterItemModalFocus(0)
-              // setFilterStatusFocusPrev(filterStatusFocus)
-              setFilterStatusFocus(0)              
-            }}>
-              <Text style={[_s.modalHeader, {color: "#68BBE3"}]}>Reset</Text>
-            </TouchableOpacity> }
+            {(isDateFilter || filterStatusFocus || filterItemFocus != 0) && (
+              <TouchableOpacity
+                onPress={() => {
+                  setIsDateFilter(false);
+                  setFilterItemModalFocus(0);
+                  // setFilterStatusFocusPrev(filterStatusFocus)
+                  setFilterStatusFocus(0);
+                }}>
+                <Text style={[_style.modalHeader, {color: '#68BBE3'}]}>Reset</Text>
+              </TouchableOpacity>
+            )}
           </View>
-          <View style={{flex: 1, paddingHorizontal: 15}}>            
-            <Text style={_s.filterHeader}>Periode</Text>
-            <View style={{flexDirection: 'row', marginTop: 10,}}>
+          <View style={[_style.flex1, _style.px15]}>
+            <Text style={_style.filterHeader}>Periode</Text>
+            <View style={[_style.rowDirection, _style.mt10]}>
               {filterItem.map((item, index) => (
                 <TouchableOpacity
                   key={index}
                   style={[
-                    _s.filterBtn,
+                    _style.filterBtn,
                     filterItemModalFocus == index
-                      ? {borderColor: '#274472', borderWidth: 1,}
+                      ? {borderColor: '#274472', borderWidth: 1}
                       : null,
                   ]}
                   activeOpacity={1}
                   onPress={() => {
-                    setFilterItemModalFocus(index)
-                    setIsDateFilter(false)
+                    setFilterItemModalFocus(index);
+                    setIsDateFilter(false);
                   }}>
-                  <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                    <Text style={_s.filterText}> {item} </Text>
+                  <View style={_style.rowDirectionCenter}>
+                    <Text style={_style.filterText}> {item} </Text>
                   </View>
                 </TouchableOpacity>
               ))}
-              <TouchableOpacity onPress={()=>setShowDatePicker(true)} style={isDateFilter ? _s.pilihTanggalContainerFocus : _s.pilihTanggalContainer}>
-                <Text>{isDateFilter ? dateToFormat(dateFilter) : 'Pilih Tanggal'}</Text>
+              <TouchableOpacity
+                onPress={() => setShowDatePicker(true)}
+                style={
+                  isDateFilter
+                    ? _s.pilihTanggalContainerFocus
+                    : _s.pilihTanggalContainer
+                }>
+                <Text>
+                  {isDateFilter ? dateToFormat(dateFilter) : 'Pilih Tanggal'}
+                </Text>
               </TouchableOpacity>
             </View>
-            <Text style={_s.filterHeader}>Status</Text>
-            <View style={{flexDirection: 'row', marginTop: 10,}}>
+            <Text style={_style.filterHeader}>Status</Text>
+            <View style={[_style.rowDirection, _style.mt10]}>
               {filterStatus.map((item, index) => (
                 <TouchableOpacity
                   key={index}
                   style={[
-                    _s.filterBtn,
+                    _style.filterBtn,
                     filterStatusFocus == index
-                      ? {borderColor: '#274472', borderWidth: 1,}
+                      ? {borderColor: '#274472', borderWidth: 1}
                       : null,
                   ]}
                   activeOpacity={1}
                   onPress={() => setFilterStatusFocus(index)}>
-                  <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                    <Text style={_s.filterText}>{item}</Text>
+                  <View style={_style.rowDirectionCenter}>
+                    <Text style={_style.filterText}>{item}</Text>
                   </View>
                 </TouchableOpacity>
               ))}
-            </View>            
+            </View>
           </View>
           <View>
-            {(filterItemModalFocus != filterItemFocus || filterStatusFocus != filterStatusFocusPrev || dateFilter != dateFilterPrev) && <Button btnText="Simpan" onPress={()=>handleFilter()} />}
+            {(filterItemModalFocus != filterItemFocus ||
+              filterStatusFocus != filterStatusFocusPrev ||
+              dateFilter != dateFilterPrev) && (
+              <Button btnText="Simpan" onPress={() => handleFilter()} />
+            )}
           </View>
         </View>
       </Modal>
 
-      <View style={_s.filterContainer}>
-        <TouchableOpacity style={_s.filterBtn} activeOpacity={1} onPress={()=>setFilterVisible(!filterVisible)}>
-          <View style={{flexDirection: 'row', alignItems: 'center'}}>            
-            {counterFilter != 0 ? <View style={_s.counterFilterContainer}>
-              <Text>{counterFilter}</Text>
-            </View> : <AntDesignIcon
-              name="filter"
-              size={20}
-              color="black"
-              style={{marginRight: 5}}
-            />}
-            <Text style={_s.filterText}>Filter </Text>            
+      <View style={_style.filterContainer}>
+        <TouchableOpacity
+          style={_style.filterBtn}
+          activeOpacity={1}
+          onPress={() => setFilterVisible(!filterVisible)}>
+          <View style={_style.rowDirectionCenter}>
+            {counterFilter != 0 ? (
+              <View style={_style.counterFilterContainer}>
+                <Text>{counterFilter}</Text>
+              </View>
+            ) : (
+              <AntDesignIcon
+                name="filter"
+                size={20}
+                color="black"
+                style={_style.mr5}
+              />
+            )}
+            <Text style={_style.filterText}>Filter </Text>
           </View>
         </TouchableOpacity>
         {filterItem.map((item, index) => (
           <TouchableOpacity
             key={index}
             style={[
-              _s.filterBtn,
+              _style.filterBtn,
               filterItemFocus == index
-                ? {borderColor: '#274472', borderWidth: 1,}
+                ? {borderColor: '#274472', borderWidth: 1}
                 : null,
             ]}
             activeOpacity={1}
             onPress={() => setFilterItemFocus(index)}>
-            <View style={{flexDirection: 'row', alignItems: 'center'}}>
+            <View style={_style.rowDirectionCenter}>
               <Text
                 style={[
-                  _s.filterText,
+                  _style.filterText,
                   filterItemFocus == index
                     ? {color: 'black'}
                     : {color: 'black'},
@@ -655,8 +790,8 @@ function TransactionHistory() {
           </TouchableOpacity>
         ))}
       </View>
-      <View style={_s.flexRow}>
-        <View style={{flex: 2, borderRightColor: '#eee', borderRightWidth: 3}}>
+      <View style={_style.flexRow}>
+        <View style={[_style.flex2, _style.tableSeparator]}>
           <FlatList
             ListHeaderComponent={historyHeaderRender}
             showsVerticalScrollIndicator={false}
@@ -667,10 +802,10 @@ function TransactionHistory() {
             stickyHeaderIndices={[0]}
           />
         </View>
-        <View style={{flex: 1}}>
+        <View style={_style.flex1}>
           {history != null ? (
             <>
-              <View style={{flex: 1}}>
+              <View style={_style.flex1}>
                 <FlatList
                   ListHeaderComponent={cartListHeaderRender}
                   showsVerticalScrollIndicator={false}
@@ -682,39 +817,35 @@ function TransactionHistory() {
               </View>
               <View
                 style={[
-                  _s.totalHeaderContainer,
-                  {borderTopColor: '#eee', borderTopWidth: 3, paddingTop: 10},
+                  _style.totalHeaderContainer,
+                  _style.tableSeparatorTop,
                 ]}>
-                <View style={{flex: 1}}>
-                  <Text style={_s.totalHeaderText}>Discount</Text>
+                <View style={_style.flex1}>
+                  <Text style={_style.totalHeaderText}>Discount</Text>
                 </View>
                 <View>
                   <Text>{stringToCurrency(history.discount)}</Text>
                 </View>
               </View>
-              <View style={_s.totalHeaderContainer}>
-                <View style={{flex: 1}}>
-                  <Text style={[_s.totalHeaderText, {fontSize: 20}]}>
+              <View style={_style.totalHeaderContainer}>
+                <View style={_style.flex1}>
+                  <Text style={[_style.totalHeaderText, {fontSize: 20}]}>
                     Total
                   </Text>
                 </View>
                 <View>
-                  <Text style={[_s.totalHeaderText, {fontSize: 20}]}>
+                  <Text style={[_style.totalHeaderText, {fontSize: 20}]}>
                     {stringToCurrency(history.grand_total)}
                   </Text>
                 </View>
               </View>
               {history.status == 'SIMPAN' ? (
-                <View style={{flexDirection: 'row'}}>
+                <View style={_style.rowDirection}>
                   <View
-                    style={{
-                      flex: 1,
-                      borderRightWidth: 3,
-                      borderRightColor: '#eee',
-                    }}>
+                    style={[_style.tableSeparator, _style.flex1]}>
                     <Button btnText="Hapus" onPress={hapusInvoice} />
                   </View>
-                  <View style={{flex: 1}}>
+                  <View style={_style.flex1}>
                     <Button
                       btnText="Edit"
                       onPress={() => {
@@ -726,8 +857,14 @@ function TransactionHistory() {
                   </View>
                 </View>
               ) : history.status == 'BAYAR' ? (
-                <View>
-                  <Button btnText="VOID" onPress={voidInvoice} />
+                <View style={_style.rowDirection}>
+                  <View
+                    style={[_style.tableSeparator, _style.flex1]}>
+                    <Button btnText="VOID" onPress={voidInvoice} />
+                  </View>
+                  <View style={_style.flex1}>
+                    <Button btnText="RE-PRINT" onPress={rePrint} />
+                  </View>
                 </View>
               ) : null}
             </>
@@ -738,109 +875,25 @@ function TransactionHistory() {
   );
 }
 
-const _s = StyleSheet.create({
-  flexRow: {
-    flex: 1,
-    flexDirection: 'row',
-  },
-  headerContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderBottomColor: '#eee',
-    borderBottomWidth: 1,
-    backgroundColor: '#274472',
-  },
-  headerText: {
-    ..._style.listItemHeaderText,
-    color: 'white',
-  },
-  listContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    alignItems: 'center',
-  },
-  listText: {
-    ..._style.bodyText,
-  },
-  historyDetailContainer: {
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    backgroundColor: '#41729F',
-  },
-  historyDetailText: {
-    color: 'white',
-    ..._style.listItemHeaderText,
-  },
-  historyDetailChildContainer: {
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    flexDirection: 'row',
-  },
-  historyDetailChildText: {
-    ..._style.bodyText,
-  },
-  totalHeaderContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    marginBottom: 10,
-  },
-  totalHeaderText: {
-    ..._style.listItemHeaderText,
-  },
-  filterContainer: {
-    flexDirection: 'row',
-    margin: 10,
-  },
-  filterBtn: {
+const _s = StyleSheet.create({  
+  pilihTanggalContainer: {
+    // marginTop: 10,
     paddingVertical: 8,
     paddingHorizontal: 10,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#eee',
-    borderRadius: 10,
-    marginRight: 8,
+    alignSelf: 'flex-start',
   },
-  filterText: {
-    ..._style.bodyText,
-    textTransform: 'capitalize',
-  },
-  filterHeader: {
-    ..._style.listItemHeaderText,
-    textTransform: 'capitalize',
-    marginTop: 25,
-  },
-  pilihTanggalContainer:{
-    // marginTop: 10,    
-    paddingVertical: 8,
-    paddingHorizontal: 10, 
-    borderRadius: 8, 
+  pilihTanggalContainerFocus: {
+    // marginTop: 10,
     borderWidth: 1,
-    borderColor: "#eee",
-    alignSelf: "flex-start",
-  },
-  pilihTanggalContainerFocus:{
-    // marginTop: 10,    
-    borderWidth: 1,
-    borderColor: "#41729F",
-    alignSelf: "flex-start",
+    borderColor: '#41729F',
+    alignSelf: 'flex-start',
     paddingVertical: 8,
     paddingHorizontal: 10,
-    borderRadius: 8, 
+    borderRadius: 8,
   },
-  modalHeader: {
-    ..._style.listItemHeaderText,fontSize: 20, marginLeft: 8,
-  },
-  counterFilterContainer: {    
-    borderColor: "#41729F",
-    borderWidth: 1,
-    paddingHorizontal: 5,
-    marginRight: 7,
-    borderRadius: 15,
-  }
 });
 
 export default TransactionHistory;

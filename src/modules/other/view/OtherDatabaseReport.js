@@ -7,32 +7,25 @@ import {
   ScrollView,
   StyleSheet,
   TouchableHighlight,
-  Alert,
+  TextInput,
 } from 'react-native';
 import {useDispatch, useSelector} from 'react-redux';
-import {queryFetch} from '../../database/DBAction';
-import {QUERY_TRX_DETAIL, QUERY_TRX_HEADER} from '../../../config/StaticQuery';
 import Container from '../../../components/Container';
 import Button from '../../../components/Button';
 import Header from '../../../components/Header';
-import _style from '../../../styles/';
+import _style from '../../../styles';
 import {
   useFocusEffect,
   useNavigation,
   useRoute,
 } from '@react-navigation/native';
-import {
-  setHistoryCartList,
-  setHistoryCartListHeader,
-} from '../../../modules/transaction/TransactionAction';
-import {dateToFormat, stringToCurrency} from '../../../util';
+import {apiRequestAxios, dateToFormat, stringToCurrency} from '../../../util';
 import AntDesignIcon from 'react-native-vector-icons/AntDesign';
-import {runSqlQuery} from '../../database/DBSaga';
 import Modal from 'react-native-modal';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {dateTimeToFormat} from '../../../util';
 
-function OtherHistory() {
+function OtherDatabaseReport() {
   const user = useSelector(state => state.user);
   const db = useSelector(state => state.database);
   const query = useSelector(state => state.query);
@@ -59,38 +52,48 @@ function OtherHistory() {
   const [refreshCartList, setRefreshCartList] = useState(false);
   const [sumGrandTotal, setSumGrandTotal] = useState(0);
   const [sumTotalDiscount, setSumTotalDiscount] = useState(0);
+  const [storeId, setStoreId] = useState('');
+  const [storeIdChange, setStoreIdChange] = useState('');
 
   const filterItem = ['Hari ini', 'Kemarin', '1 Minggu Terakhir'];
-  const filterStatus = ['Semua', 'Simpan', 'Hapus', 'Void'];
+  const filterStatus = ['Semua', 'Simpan', 'Hapus', 'Bayar', 'Void'];
 
   const headerTable = [
     {
-      key: 'id',
+      key: 'trxHeader_id',
       value: 'Trx No',
     },
     {
-      key: 'created_date',
+      key: 'trxHeader_createdDate',
       value: 'Trx Date',
     },
     {
-      key: 'grand_total',
+      key: 'trxHeader_grandTotal',
       value: 'Grand Total',
     },
     {
-      key: 'discount',
+      key: 'trxHeader_discount',
       value: 'Discount',
     },
     {
-      key: 'total_item',
+      key: 'trxHeader_totalItem',
       value: 'Items',
     },
     {
-      key: 'status',
+      key: 'trxHeader_status',
       value: 'Status',
     },
     {
-      key: 'ref_void_id',
+      key: 'trxHeader_refVoidId',
       value: 'Ref',
+    },
+    {
+      key: 'trxHeader_storeId',
+      value: 'Store ID',
+    },
+    {
+      key: 'trxHeader_storeName',
+      value: 'Store Name',
     },
   ];
 
@@ -107,7 +110,7 @@ function OtherHistory() {
       key: 'total',
       value: 'Disc/Total',
     },
-  ];  
+  ];
 
   //api call only run once
   useEffect(async () => {
@@ -128,18 +131,14 @@ function OtherHistory() {
 
   useEffect(async () => {
     if (history.id != undefined) {
-      let param = [];
-      param.push(
-        history.ref_void_id != null ? history.ref_void_id : history.id,
-      );
-      await apiGetTrxDetail(param);
+      setCartList(history.items);
     }
   }, [history.id, refreshCartList]);
 
   useEffect(async () => {
     await runApiGetByDate();
     setFilterItemModalFocus(filterItemFocus);
-  }, [filterItemFocus, filterStatusFocusPrev, dateFilterPrev]);
+  }, [filterItemFocus, filterStatusFocusPrev, dateFilterPrev, storeId]);
 
   function runApiGetByDate() {
     let today = new Date();
@@ -156,227 +155,107 @@ function OtherHistory() {
       isDateFilter ? dateFilterPrev : today,
     );
 
-    let param = [];
-    param.push(currentDateTimeFormatted);
-    param.push(
+    let obj = {};
+    obj.date = currentDateTimeFormatted;
+    obj.status =
       filterStatusFocus != 0
         ? `%${filterStatus[filterStatusFocus].toUpperCase()}%`
-        : '%%',
-    );
+        : '%%';
+    obj.storeId = storeId;
     if (filterItem[filterItemFocus] == '1 Minggu Terakhir') {
-      let param = [];
       let tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
-      param.push(currentDateTimeFormatted);
-      param.push(dateToFormat(tomorrow));
-      param.push(
-        filterStatusFocus != 0
-          ? `%${filterStatus[filterStatusFocus].toUpperCase()}%`
-          : '%%',
-      );
-      apiGetByDateBetween(param);
+      obj.date = undefined;
+      obj.startDate = currentDateTimeFormatted;
+      obj.endDate = dateToFormat(tomorrow);
+      apiGetByDateBetween(obj);
     } else {
-      apiGetByDate(param);
+      apiGetByDate(obj);
     }
-  
+
     if (filterStatusFocus != 0) setCounterFilter(1);
     if (filterItemFocus != 0) setCounterFilter(1);
     if (filterItemFocus == 0 && filterStatusFocus == 0) setCounterFilter(0);
-    if (filterItemFocus != 0 && filterStatusFocus != 0) setCounterFilter(2);    
+    if (filterItemFocus != 0 && filterStatusFocus != 0) setCounterFilter(2);
   }
 
-  function apiGetTotalItemByRefVoidId(param) {
-    return runSqlQuery(
-      db.database,
-      QUERY_TRX_DETAIL.SELECT_TOTAL_ITEMS_BY_TRX_HEADER_ID,
-      param,
-    );
-  }
-
-  //get updated data
-  useEffect(async () => {
-    if (!query.fetchQuery) {
-      if (
-        query.send.sql == QUERY_TRX_HEADER.SELECT_BY_DATE ||
-        query.send.sql == QUERY_TRX_HEADER.SELECT_BY_DATE_BETWEEN
-      ) {
-        let rows = query.res.rows;
-        if (rows.length > 0) {
-          let resultList = [];
-          let sumGrandTotal = 0;
-          let sumTotalDiscount = 0;
-          for (let i = 0; i < rows.length; i++) {
-            let item = rows.item(i)
-            if (item.ref_void_id != null) {
-              let param = [];
-              param.push(item.ref_void_id);
-              let totalItem = await apiGetTotalItemByRefVoidId(param);
-              item.total_item = totalItem.rows.item(0).total_item;
-            }
-            sumGrandTotal += (item.status == 'BAYAR' ? parseInt(item.grand_total) : 0)
-            sumTotalDiscount += (item.status == 'BAYAR' ? parseInt(item.discount) : 0) 
-            await resultList.push(item);
-          }
-          setSumGrandTotal(sumGrandTotal)
-          setSumTotalDiscount(sumTotalDiscount)
-          setHistory(resultList[0]);
-          setRefreshCartList(!refreshCartList);
-          setHistoryList(resultList);
-          setDataTableFocus(0);
-        } else {
-          setCartList([]);
-          setHistory({});
-          setHistoryList([]);
-        }
-      }
-
-      if (query.send.sql == QUERY_TRX_DETAIL.SELECT_BY_TRX_HEADER_ID) {
-        let rows = query.res.rows;
-        if (rows.length > 0) {
-          let resultList = [];
-          for (let i = 0; i < rows.length; i++) {
-            let item = rows.item(i)
-            resultList.push(item);
-          }
-          setCartList(resultList);
-        } else {
-          setCartList([]);
-        }
-      }
-    }
-  }, [query.fetchQuery]);
-
-  function apiGetTrxDetail(param) {
-    dispatch(
-      queryFetch({
-        sql: QUERY_TRX_DETAIL.SELECT_BY_TRX_HEADER_ID,
-        param,
-      }),
-    );
-  }
-
-  function hapusInvoice() {
-    Alert.alert(
-      'Confirmation',
-      'Are you sure to delete this transaction?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Yes',
-          onPress: async () => {
-            let param = [];
-            param.push('HAPUS');
-            param.push('E');
-            param.push(history.id);
-            await apiUpdateStatus(param);
-            await runApiGetByDate();
-            Alert.alert('Information', 'Transaction successfully deleted!', [
-              {
-                text: 'Ok',
-                style: 'default',
-              },
-            ]);
-          },
-          style: 'default',
-        },
-      ],
+  async function apiGetByDate(param) {
+    await apiRequestAxios(
+      user.store.api_url + `/transactionHeader/report`,
+      'get',
       {
-        cancelable: false,
+        params: {
+          date: param.date,
+          status: param.status,
+          storeId: param.storeId,
+        },
       },
-    );
+    ).then(async res => {
+      let sumGrandTotal = 0;
+      let sumTotalDiscount = 0;
+      let result = res.data.result;
+
+      if (result.length > 0) {
+        for (let i = 0; i < result.length; i++) {
+          sumGrandTotal +=
+            result[i].trxHeader_status == 'BAYAR'
+              ? parseInt(result[i].trxHeader_grandTotal)
+              : 0;
+          sumTotalDiscount +=
+            result[i].trxHeader_status == 'BAYAR'
+              ? parseInt(result[i].trxHeader_discount)
+              : 0;
+        }
+        await setHistory(result[0]);
+        await setSumGrandTotal(sumGrandTotal);
+        await setSumTotalDiscount(sumTotalDiscount);
+        await setHistoryList(result);
+      } else {
+        await setHistory({});
+        await setHistoryList([]);
+        await setCartList([]);
+      }
+    });
   }
 
-  function apiUpdateStatus(param) {
-    dispatch(
-      queryFetch({
-        sql: QUERY_TRX_HEADER.UPDATE_STATUS,
-        param,
-      }),
-    );
-  }
-
-  function apiInsertToTrxHeaderVoid(param) {
-    dispatch(
-      queryFetch({
-        sql: QUERY_TRX_HEADER.INSERT_VOID,
-        param,
-      }),
-    );
-  }
-
-  function voidInvoice() {
-    Alert.alert(
-      'Confirmation',
-      'Are you sure to void this transaction?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Yes',
-          onPress: async () => {
-            let param = [];
-            param.push('VOID');
-            param.push('E');
-            param.push(history.id);
-            await apiUpdateStatus(param);
-
-            let today = new Date();
-            let currentDateTimeFormatted = dateTimeToFormat(today);
-
-            let discount =
-              parseInt(history.discount) - parseInt(history.discount) * 2;
-            let grandTotal =
-              parseInt(history.grand_total) - parseInt(history.grand_total) * 2;
-
-            let paramHeader = [];
-            paramHeader.push(currentDateTimeFormatted);
-            paramHeader.push(discount);
-            paramHeader.push(grandTotal);
-            paramHeader.push('VOID');
-            paramHeader.push(history.id);
-            paramHeader.push(currentDateTimeFormatted);
-            paramHeader.push(user.store.id);
-            paramHeader.push(user.store.name);
-            paramHeader.push('N');
-            await apiInsertToTrxHeaderVoid(paramHeader);
-            await runApiGetByDate();
-            Alert.alert('Information', 'Transaction successfully voided!', [
-              {
-                text: 'Ok',
-                style: 'default',
-              },
-            ]);
-          },
-          style: 'default',
-        },
-      ],
+  async function apiGetByDateBetween(param) {
+    await apiRequestAxios(
+      user.store.api_url + `/transactionHeader/report`,
+      'get',
       {
-        cancelable: false,
+        params: {
+          startDate: param.startDate,
+          endDate: param.endDate,
+          status: param.status,
+          storeId: param.storeId,
+        },
       },
-    );
-  }
+    ).then(async res => {
+      let sumGrandTotal = 0;
+      let sumTotalDiscount = 0;
+      let result = res.data.result;
 
-  function apiGetByDate(param) {
-    dispatch(
-      queryFetch({
-        sql: QUERY_TRX_HEADER.SELECT_BY_DATE,
-        param,
-      }),
-    );
-  }
-
-  function apiGetByDateBetween(param) {
-    dispatch(
-      queryFetch({
-        sql: QUERY_TRX_HEADER.SELECT_BY_DATE_BETWEEN,
-        param,
-      }),
-    );
+      if (result.length > 0) {
+        for (let i = 0; i < result.length; i++) {
+          sumGrandTotal +=
+            result[i].trxHeader_status == 'BAYAR'
+              ? parseInt(result[i].trxHeader_grandTotal)
+              : 0;
+          sumTotalDiscount +=
+            result[i].trxHeader_status == 'BAYAR'
+              ? parseInt(result[i].trxHeader_discount)
+              : 0;
+        }
+        await setHistory(result[0]);
+        await setSumGrandTotal(sumGrandTotal);
+        await setSumTotalDiscount(sumTotalDiscount);
+        await setHistoryList(result);
+      } else {
+        await setHistory({});
+        await setHistoryList([]);
+        await setCartList([]);
+      }
+    });
   }
 
   function dataRender({item, index}) {
@@ -396,10 +275,12 @@ function OtherHistory() {
           {headerTable.map((v, i) => (
             <View key={i} style={_style.flex1}>
               <Text style={_style.rowTableText}>
-                {v.key == 'discount' ||
-                v.key == 'grand_total' ||
-                v.key == 'total_item'
+                {v.key == 'trxHeader_discount' ||
+                v.key == 'trxHeader_grandTotal' ||
+                v.key == 'trxHeader_totalItem'
                   ? stringToCurrency(item[v.key])
+                  : v.key == 'trxHeader_createdDate'
+                  ? dateTimeToFormat(new Date(item[v.key]))
                   : item[v.key]}
               </Text>
             </View>
@@ -426,41 +307,36 @@ function OtherHistory() {
       <View key={index} style={[_style.rowTable]}>
         <>
           {headerTableCartList.map((v, i) => (
-            <View
-              key={i}
-              style={_style.flexRowCenter}>
+            <View key={i} style={_style.flexRowCenter}>
               {v.key == 'name' ? (
                 <View style={_style.flex1}>
-                  <Text style={[_style.rowTableText, _style.listItemHeaderText]}>
-                    {item.item_name}
+                  <Text
+                    style={[_style.rowTableText, _style.listItemHeaderText]}>
+                    {item.trxDetail_itemName}
                   </Text>
                 </View>
               ) : null}
               {v.key == 'price' ? (
                 <View style={_style.flexEnd}>
                   <Text style={_style.rowTableText}>
-                    {item.priceNew != undefined
-                      ? stringToCurrency(item.priceNew)
-                      : stringToCurrency(item.price)}
+                    {stringToCurrency(item.trxDetail_price)}
                   </Text>
                   <Text style={_style.rowTableText}>
                     {history.ref_void_id != null
-                      ? `-${stringToCurrency(item.quantity)}`
-                      : stringToCurrency(item.quantity)}
+                      ? `-${stringToCurrency(item.trxDetail_quantity)}`
+                      : stringToCurrency(item.trxDetail_quantity)}
                   </Text>
                 </View>
               ) : null}
               {v.key == 'total' ? (
                 <View style={_style.flexEnd}>
                   <Text style={_style.rowTableText}>
-                    {item.discountNew != undefined
-                      ? stringToCurrency(item.discountNew)
-                      : stringToCurrency(item.discount)}
+                    {stringToCurrency(item.trxDetail_discount)}
                   </Text>
                   <Text style={_style.rowTableText}>
                     {history.ref_void_id != null
-                      ? `-${stringToCurrency(item.total)}`
-                      : stringToCurrency(item.total)}
+                      ? `-${stringToCurrency(item.trxDetail_total)}`
+                      : stringToCurrency(item.trxDetail_total)}
                   </Text>
                 </View>
               ) : null}
@@ -498,17 +374,30 @@ function OtherHistory() {
   }
 
   async function handleFilter() {
+    await setStoreId(storeIdChange);
     await setFilterItemFocus(filterItemModalFocus);
     await setFilterStatusFocusPrev(filterStatusFocus);
     await setFilterVisible(!filterVisible);
     await setDateFilterPrev(dateFilter);
 
-    if (filterItemModalFocus != 0 && filterStatusFocus != 0) {
-      setCounterFilter(2);
-    } else if (filterItemModalFocus == 0 && filterStatusFocus == 0) {
+    if (
+      filterItemModalFocus != 0 &&
+      filterStatusFocus != 0 &&
+      storeIdChange.length != 0
+    ) {
+      setCounterFilter(3);
+    } else if (
+      filterItemModalFocus == 0 &&
+      filterStatusFocus == 0 &&
+      storeIdChange.length == 0
+    ) {
       setCounterFilter(0);
-    } else if (filterItemModalFocus != 0 || filterStatusFocus != 0) {
-      setCounterFilter(1);
+    } else {
+      let tmp = 0;
+      if (filterItemModalFocus != 0) tmp++;
+      if (filterStatusFocus != 0) tmp++;
+      if (storeIdChange.length > 0) tmp++;
+      setCounterFilter(tmp);
     }
   }
 
@@ -521,7 +410,7 @@ function OtherHistory() {
 
   return (
     <Container>
-      <Header backBtn={true} name="Other Transaction History" />
+      <Header backBtn={true} name="Database Report" />
       {showDatePicker && (
         <DateTimePicker
           value={dateFilter}
@@ -532,13 +421,12 @@ function OtherHistory() {
         />
       )}
       <Modal
-        isVisible={filterVisible}
         style={_style.margin0}
+        isVisible={filterVisible}
         onBackdropPress={cancelFilter}
         onBackButtonPress={cancelFilter}>
         <View style={[_style.flex1, _style.bgWhite]}>
-          <View
-            style={[_style.rowDirectionCenter, _style.px15, _style.pt15]}>
+          <View style={[_style.rowDirectionCenter, _style.px15, _style.pt15]}>
             <TouchableOpacity onPress={cancelFilter}>
               <AntDesignIcon
                 name="close"
@@ -555,70 +443,81 @@ function OtherHistory() {
                 onPress={() => {
                   setIsDateFilter(false);
                   setFilterItemModalFocus(0);
-                  // setFilterStatusFocusPrev(filterStatusFocus)
                   setFilterStatusFocus(0);
                 }}>
-                <Text style={[_style.modalHeader, {color: '#68BBE3'}]}>Reset</Text>
+                <Text style={[_style.modalHeader, {color: '#68BBE3'}]}>
+                  Reset
+                </Text>
               </TouchableOpacity>
             )}
           </View>
-          <View style={[_style.flex1, _style.px15]}>
-            <Text style={_style.filterHeader}>Periode</Text>
-            <View style={[_style.rowDirection, _style.mt10]}>
-              {filterItem.map((item, index) => (
+          <ScrollView>
+            <View style={[_style.flex1, _style.px15]}>
+              <Text style={_style.filterHeader}>Periode</Text>
+              <View style={[_style.rowDirection, _style.mt10]}>
+                {filterItem.map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={[
+                      _style.filterBtn,
+                      filterItemModalFocus == index
+                        ? {borderColor: '#274472', borderWidth: 1}
+                        : null,
+                    ]}
+                    activeOpacity={1}
+                    onPress={() => {
+                      setFilterItemModalFocus(index);
+                      setIsDateFilter(false);
+                    }}>
+                    <View style={_style.rowDirectionCenter}>
+                      <Text style={_style.filterText}> {item} </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
                 <TouchableOpacity
-                  key={index}
-                  style={[
-                    _style.filterBtn,
-                    filterItemModalFocus == index
-                      ? {borderColor: '#274472', borderWidth: 1}
-                      : null,
-                  ]}
-                  activeOpacity={1}
-                  onPress={() => {
-                    setFilterItemModalFocus(index);
-                    setIsDateFilter(false);
-                  }}>
-                  <View style={_style.rowDirectionCenter}>
-                    <Text style={_style.filterText}> {item} </Text>
-                  </View>
+                  onPress={() => setShowDatePicker(true)}
+                  style={
+                    isDateFilter
+                      ? _s.pilihTanggalContainerFocus
+                      : _s.pilihTanggalContainer
+                  }>
+                  <Text>
+                    {isDateFilter ? dateToFormat(dateFilter) : 'Pilih Tanggal'}
+                  </Text>
                 </TouchableOpacity>
-              ))}
-              <TouchableOpacity
-                onPress={() => setShowDatePicker(true)}
-                style={
-                  isDateFilter
-                    ? _s.pilihTanggalContainerFocus
-                    : _s.pilihTanggalContainer
-                }>
-                <Text>
-                  {isDateFilter ? dateToFormat(dateFilter) : 'Pilih Tanggal'}
-                </Text>
-              </TouchableOpacity>
+              </View>
+              <Text style={_style.filterHeader}>Status</Text>
+              <View style={[_style.rowDirection, _style.mt10]}>
+                {filterStatus.map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={[
+                      _style.filterBtn,
+                      filterStatusFocus == index
+                        ? {borderColor: '#274472', borderWidth: 1}
+                        : null,
+                    ]}
+                    activeOpacity={1}
+                    onPress={() => setFilterStatusFocus(index)}>
+                    <View style={_style.rowDirectionCenter}>
+                      <Text style={_style.filterText}>{item}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Text style={_style.filterHeader}>Store ID</Text>
+              <TextInput
+                style={_style.fieldText}
+                onChangeText={text => setStoreIdChange(text)}
+                placeholder="Store ID..."
+                defaultValue={storeId}
+              />
             </View>
-            <Text style={_style.filterHeader}>Status</Text>
-            <View style={[_style.rowDirection, _style.mt10]}>
-              {filterStatus.map((item, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={[
-                    _style.filterBtn,
-                    filterStatusFocus == index
-                      ? {borderColor: '#274472', borderWidth: 1}
-                      : null,
-                  ]}
-                  activeOpacity={1}
-                  onPress={() => setFilterStatusFocus(index)}>
-                  <View style={_style.rowDirectionCenter}>
-                    <Text style={_style.filterText}>{item}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
+          </ScrollView>
           <View>
             {(filterItemModalFocus != filterItemFocus ||
               filterStatusFocus != filterStatusFocusPrev ||
+              storeIdChange != storeId ||
               dateFilter != dateFilterPrev) && (
               <Button btnText="Simpan" onPress={() => handleFilter()} />
             )}
@@ -671,14 +570,18 @@ function OtherHistory() {
             </View>
           </TouchableOpacity>
         ))}
-        <View style={_style.rowDirectionCenter}>
-        <View style={_style.flexEnd}>
-              <Text style={_style.listItemHeaderText}>Grand Total : {stringToCurrency(sumGrandTotal)}</Text>
-            </View>
-            <View style={_style.flexEnd}>
-              <Text style={_style.listItemHeaderText}>Total Discount : {stringToCurrency(sumTotalDiscount)}</Text>
-            </View>
-        </View>        
+        <View style={[_style.flexRowCenter]}>
+          <View style={_style.flexEnd}>
+            <Text style={_style.listItemHeaderText}>
+              Grand Total : {stringToCurrency(sumGrandTotal)}
+            </Text>
+          </View>
+          <View style={_style.flexEnd}>
+            <Text style={_style.listItemHeaderText}>
+              Total Discount : {stringToCurrency(sumTotalDiscount)}
+            </Text>
+          </View>
+        </View>
       </View>
       <View style={_style.flexRow}>
         <View style={[_style.flex2, _style.tableSeparator]}>
@@ -690,7 +593,10 @@ function OtherHistory() {
             extraData={historyList}
             keyExtractor={(item, index) => index}
             stickyHeaderIndices={[0]}
-          />          
+          />
+          <View style={[_style.tableSeparatorTop, _style.py5, _style.px10]}>
+            <Text>Total row : {historyList.length}</Text>
+          </View>
         </View>
         <View style={_style.flex1}>
           {history != null ? (
@@ -706,15 +612,12 @@ function OtherHistory() {
                 />
               </View>
               <View
-                style={[
-                  _style.totalHeaderContainer,
-                  _style.tableSeparatorTop,
-                ]}>
+                style={[_style.totalHeaderContainer, _style.tableSeparatorTop]}>
                 <View style={_style.flex1}>
                   <Text style={_style.totalHeaderText}>Discount</Text>
                 </View>
                 <View>
-                  <Text>{stringToCurrency(history.discount)}</Text>
+                  <Text>{stringToCurrency(history.trxHeader_discount)}</Text>
                 </View>
               </View>
               <View style={_style.totalHeaderContainer}>
@@ -725,38 +628,10 @@ function OtherHistory() {
                 </View>
                 <View>
                   <Text style={[_style.totalHeaderText, {fontSize: 20}]}>
-                    {stringToCurrency(history.grand_total)}
+                    {stringToCurrency(history.trxHeader_grandTotal)}
                   </Text>
                 </View>
               </View>
-              {history.status == 'SIMPAN' ? (
-                <View style={_style.rowDirection}>
-                  <View
-                    style={[_style.tableSeparator, _style.flex1]}>
-                    <Button btnText="Hapus" onPress={hapusInvoice} />
-                  </View>
-                  <View style={_style.flex1}>
-                    <Button
-                      btnText="Edit"
-                      onPress={() => {
-                        dispatch(setHistoryCartList(cartList));
-                        dispatch(setHistoryCartListHeader(history));
-                        navigation.navigate('Transaction');
-                      }}
-                    />
-                  </View>
-                </View>
-              ) : history.status == 'BAYAR' ? (
-                <View style={_style.rowDirection}>
-                  <View style={[_style.tableSeparator, _style.flex1]}>
-                        <Button btnText="VOID" onPress={voidInvoice} />
-                    
-                  </View>
-                  <View style={_style.flex1}>
-                    <Button btnText="RE-PRINT" onPress={()=>console.log("Reprint process")} />
-                  </View>
-                </View>
-              ) : null}
             </>
           ) : null}
         </View>
@@ -765,7 +640,7 @@ function OtherHistory() {
   );
 }
 
-const _s = StyleSheet.create({  
+const _s = StyleSheet.create({
   pilihTanggalContainer: {
     // marginTop: 10,
     paddingVertical: 8,
@@ -786,4 +661,4 @@ const _s = StyleSheet.create({
   },
 });
 
-export default OtherHistory;
+export default OtherDatabaseReport;

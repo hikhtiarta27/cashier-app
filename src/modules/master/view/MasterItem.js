@@ -18,10 +18,10 @@ import {QUERY_ITEM, QUERY_CATEGORY} from '../../../config/StaticQuery';
 import Container from '../../../components/Container';
 import Button from '../../../components/Button';
 import Header from '../../../components/Header';
-import _style from '../../../styles/Typrograhpy';
+import _style from '../../../styles/';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import DocumentPicker from 'react-native-document-picker';
-import {stringToCurrency} from '../../../util';
+import {dateTimeToFormat, stringToCurrency} from '../../../util';
 import AntDesignIcon from 'react-native-vector-icons/AntDesign';
 import Modal from 'react-native-modal';
 
@@ -116,12 +116,12 @@ function MasterItem() {
     apiGetItemsList();    
   }, []);
 
-  // useFocusEffect(
-  //   useCallback(() => {
-  //     const unsubscribe = apiGetItemsList();      
-  //     return () => unsubscribe;
-  //   }, []),
-  // );
+  useFocusEffect(
+    useCallback(() => {
+      const unsubscribe = apiGetItemsList();      
+      return () => unsubscribe;
+    }, []),
+  );
 
   //get updated data
   useEffect(() => {
@@ -186,8 +186,10 @@ function MasterItem() {
             {
               text: 'Yes',
               onPress: async () => {
+                let today = dateTimeToFormat(new Date())
                 await apiDeleteItemsList();
                 for (let i = 1; i < dataParse.length; i++) {
+                  dataParse[i].push(today)
                   await apiInsertItemsList(dataParse[i]);
                 }
                 await apiGetItemsList();
@@ -224,7 +226,7 @@ function MasterItem() {
       <TouchableHighlight
         key={index}
         style={[
-          _s.listContainer,
+          _style.rowTable,
           dataTableFocus == index ? {backgroundColor: '#eee'} : null,
         ]}
         onPress={() => {
@@ -234,8 +236,8 @@ function MasterItem() {
         underlayColor="#eee">
         <>
           {headerTable.map((v, i) => (
-            <View key={i} style={{flex: 1}}>
-              <Text style={_s.listText}>
+            <View key={i} style={_style.flex1}>
+              <Text style={_style.rowTableText}>
                 {v.key == 'discount' || v.key == 'price'
                   ? stringToCurrency(item[v.key])
                   : item[v.key]}
@@ -249,10 +251,10 @@ function MasterItem() {
 
   function itemsHeaderRender() {
     return (
-      <View style={_s.headerContainer}>
+      <View style={_style.headerTable}>
         {headerTable.map((item, index) => (
-          <View key={index} style={{flex: 1}}>
-            <Text style={_s.headerText}>{item.value}</Text>
+          <View key={index} style={_style.flex1}>
+            <Text style={_style.headerTableText}>{item.value}</Text>
           </View>
         ))}
       </View>
@@ -308,83 +310,53 @@ function MasterItem() {
     <Container>
       <Modal
         isVisible={filterVisible}
-        style={{margin: 1}}
+        style={_style.margin0}
         onBackdropPress={cancelFilter}
         onBackButtonPress={cancelFilter}>
-        <View style={{flex: 1, backgroundColor: 'white'}}>
+        <View style={[_style.flex1, _style.bgWhite]}>
           <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              paddingHorizontal: 15,
-              paddingTop: 15,
-            }}>
+            style={[_style.rowDirectionCenter, _style.px15, _style.pt15]}>
             <TouchableOpacity onPress={cancelFilter}>
               <AntDesignIcon
                 name="close"
                 size={25}
                 color="black"
-                style={{marginRight: 5}}
+                style={_style.mr5}
               />
             </TouchableOpacity>
-            <View style={{flex: 1}}>
-              <Text style={_s.modalHeader}>Filter</Text>
-            </View>
-            {/* {(isDateFilter || filterStatusFocus || filterItemFocus != 0) && <TouchableOpacity onPress={()=>{
-              setIsDateFilter(false)
-              setFilterCategoryModalFocus(0)
-              // setFilterStatusFocusPrev(filterStatusFocus)
-              setFilterStatusFocus(0)              
-            }}>
-              <Text style={[_s.modalHeader, {color: "#68BBE3"}]}>Reset</Text>
-            </TouchableOpacity> } */}
+            <View style={_style.flex1}>
+              <Text style={_style.modalHeader}>Filter</Text>
+            </View>        
           </View>
-          <View style={{flex: 1, paddingHorizontal: 15}}>
-            <Text style={_s.filterHeader}>Kategori</Text>
-            <View style={{marginTop: 10}}>
+          <View style={[_style.flex1, _style.px15]}>
+            <Text style={_style.filterHeader}>Kategori</Text>
+            <View style={_style.mt10}>
               <TextInput
-                style={[_s.searchField, {borderColor: "#eee", borderWidth: 1, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 10}]}
+                style={[_style.searchField, {borderColor: "#eee", borderWidth: 1, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 10}]}
                 placeholder="Search by category code..."
                 onChangeText={text => searchTextCategory(text)}
                 defaultValue={filterCategoryText}
               />
             </View>
-            <View style={{flexDirection: 'row', marginTop: 10}}>              
-              {categoryList.length != 0 && categoryList.map((item, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={[
-                    _s.filterBtn,
-                    filterCategoryText == item.code
-                      ? {borderColor: '#274472', borderWidth: 1}
-                      : null,
-                  ]}
-                  activeOpacity={1} onPress={()=>setFilterCategoryText(item.code)}>
-                  <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                    <Text style={_s.filterText}> {item.code} - {item.name} </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {/* <Text style={_s.filterHeader}>Status</Text>
-            <View style={{flexDirection: 'row', marginTop: 10,}}>
-              {filterStatus.map((item, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={[
-                    _s.filterBtn,
-                    filterStatusFocus == index
-                      ? {borderColor: '#274472', borderWidth: 1,}
-                      : null,
-                  ]}
-                  activeOpacity={1}
-                  onPress={() => setFilterStatusFocus(index)}>
-                  <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                    <Text style={_s.filterText}>{item}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>             */}
+            <View>
+              <ScrollView contentContainerStyle={[_style.rowDirection, _style.mt10]} horizontal showsHorizontalScrollIndicator={false}>
+                {categoryList.length != 0 && categoryList.map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={[
+                      _style.filterBtn,
+                      filterCategoryText == item.code
+                        ? {borderColor: '#274472', borderWidth: 1}
+                        : null,
+                    ]}
+                    activeOpacity={1} onPress={()=>setFilterCategoryText(item.code)}>
+                    <View style={_style.rowDirectionCenter}>
+                      <Text style={_style.filterText}> {item.code} - {item.name} </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>     
+            </View>         
           </View>
           <View>
             <Button btnText="Simpan" onPress={handleFilter}/>
@@ -394,14 +366,14 @@ function MasterItem() {
 
       <Header drawerBtn={true} name="Master Items" />
 
-      <View style={_s.filterContainer}>
+      <View style={_style.filterContainer}>
         <TouchableOpacity
-          style={_s.filterBtn}
+          style={_style.filterBtn}
           activeOpacity={1}
           onPress={() => setFilterVisible(!filterVisible)}>
-          <View style={{flexDirection: 'row', alignItems: 'center'}}>
+          <View style={_style.rowDirectionCenter}>
             {counterFilter != 0 ? (
-              <View style={_s.counterFilterContainer}>
+              <View style={_style.counterFilterContainer}>
                 <Text>{counterFilter}</Text>
               </View>
             ) : (
@@ -409,23 +381,23 @@ function MasterItem() {
                 name="filter"
                 size={20}
                 color="black"
-                style={{marginRight: 5}}
+                style={_style.mr5}
               />
             )}
-            <Text style={_s.filterText}>Filter </Text>
+            <Text style={_style.filterText}>Filter </Text>
           </View>
         </TouchableOpacity>
-        <View style={{flex: 1}}>
+        <View style={_style.flex1}>
           <TextInput
-            style={_s.searchField}
+            style={_style.searchField}
             placeholder="Search by item name..."
             onChangeText={text => searchText(text)}
           />
         </View>
       </View>
 
-      <View style={_s.flexRow}>
-        <View style={{flex: 2, borderRightColor: '#eee', borderRightWidth: 3}}>
+      <View style={_style.flexRow}>
+        <View style={[_style.flex2, _style.tableSeparator]}>
           <FlatList
             ListHeaderComponent={itemsHeaderRender}
             showsVerticalScrollIndicator={false}
@@ -437,16 +409,14 @@ function MasterItem() {
           />
           <Button btnText="Import" onPress={importData} />
         </View>
-        <View style={{flex: 1}}>
-          {items != null ? (
-            <>
-              <View style={{flex: 1}}>
+        <View style={_style.flex1}>
+             <View style={_style.flex1}>
                 <View style={_s.itemsDetailContainer}>
                   <Text style={_s.itemsDetailText}>Items Detail</Text>
                 </View>
                 {headerTable.map((item, index) => (
                   <View key={index} style={_s.itemsDetailChildContainer}>
-                    <View style={{flex: 1}}>
+                    <View style={_style.flex1}>
                       <Text
                         style={[
                           _s.itemsDetailChildText,
@@ -455,59 +425,31 @@ function MasterItem() {
                         {item.value}
                       </Text>
                     </View>
+                    {items != null &&
                     <View>
                       <Text style={_s.itemsDetailChildText}>
                         {item.key == 'discount' || item.key == 'price'
                           ? stringToCurrency(items[item.key])
                           : items[item.key]}
                       </Text>
-                    </View>
+                    </View> }
                   </View>
                 ))}
               </View>
+              {items != null && 
               <View>
                 <Button
                   btnText="edit"
                   onPress={() => navigation.navigate('MasterItemEdit', items)}
                 />
-              </View>
-            </>
-          ) : null}
+              </View>   }        
         </View>
       </View>
     </Container>
   );
 }
 
-const _s = StyleSheet.create({
-  flexRow: {
-    flex: 1,
-    flexDirection: 'row',
-  },
-  headerContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderBottomColor: '#eee',
-    borderBottomWidth: 1,
-    backgroundColor: '#274472',
-  },
-  headerText: {
-    ..._style.listItemHeaderText,
-    color: 'white',
-  },
-  listContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    alignItems: 'center',
-  },
-  listText: {
-    ..._style.bodyText,
-    paddingRight: 10,
-  },
+const _s = StyleSheet.create({  
   itemsDetailContainer: {
     paddingVertical: 10,
     paddingHorizontal: 10,
@@ -524,62 +466,6 @@ const _s = StyleSheet.create({
   },
   itemsDetailChildText: {
     ..._style.bodyText,
-  },
-  filterContainer: {
-    flexDirection: 'row',
-    margin: 10,
-    alignItems: 'center'
-  },
-  filterBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: '#eee',
-    borderRadius: 10,
-    marginRight: 8,
-  },
-  filterText: {
-    ..._style.bodyText,
-    textTransform: 'capitalize',
-  },
-  filterHeader: {
-    ..._style.listItemHeaderText,
-    textTransform: 'capitalize',
-    marginTop: 25,
-  },
-  pilihTanggalContainer: {
-    // marginTop: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#eee',
-    alignSelf: 'flex-start',
-  },
-  pilihTanggalContainerFocus: {
-    // marginTop: 10,
-    borderWidth: 1,
-    borderColor: '#41729F',
-    alignSelf: 'flex-start',
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-  },
-  modalHeader: {
-    ..._style.listItemHeaderText,
-    fontSize: 20,
-    marginLeft: 8,
-  },
-  counterFilterContainer: {
-    borderColor: '#41729F',
-    borderWidth: 1,
-    paddingHorizontal: 5,
-    marginRight: 7,
-    borderRadius: 15,
-  },
-  searchField: {
-    marginVertical: 0,
-    paddingVertical: 0,
   },
 });
 

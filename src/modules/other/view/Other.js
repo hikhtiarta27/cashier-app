@@ -21,7 +21,9 @@ import * as Yup from 'yup';
 import AntDesignIcon from 'react-native-vector-icons/AntDesign'
 import _style from '../../../styles';
 import { useNavigation } from '@react-navigation/native';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
+import { queryFetch } from '../../database/DBAction';
+import { QUERY_STORE } from '../../../config/StaticQuery';
 
 const otherScheme = Yup.object().shape({
   password: Yup.string().required('Required'),
@@ -36,12 +38,14 @@ const formList = [
 
 const menuList = [
   "History Report",
-  "Change Password"
+  "Database Report"
 ];
 
 function Other() {
-  const user = useSelector(state => state.user)
-  const [passwordDialog, setPasswordDialog] = useState(false);
+  const query = useSelector(state => state.query)
+  const dispatch = useDispatch()
+  const [store, setStore] = useState({});
+  const [passwordDialog, setPasswordDialog] = useState(true);
   const navigation = useNavigation()
   const formik = useFormik({
     initialValues: {
@@ -49,7 +53,7 @@ function Other() {
     },
     validationSchema: otherScheme,
     onSubmit: async values => {
-      if(values.password != user.password){
+      if(values.password != store.password){
         formik.setFieldError("password", "Wrong password")
       }else{
         setPasswordDialog(false)        
@@ -57,17 +61,42 @@ function Other() {
     },
   });
 
-  useEffect(() => {
-    showPasswordDialog();
+  function apiGetStoreList() {
+    dispatch(
+      queryFetch({
+        sql: QUERY_STORE.SELECT,
+      }),
+    );
+  }
+
+  useEffect(async() => {
+    await showPasswordDialog();
+    await apiGetStoreList();
   }, []);
 
   useFocusEffect(
     useCallback(() => {      
-      const subscribe = showPasswordDialog();
-      formik.resetForm()
-      return () => subscribe;
+      const unsubscribe = apiGetStoreList();
+      const unsubscribe1 = showPasswordDialog();
+      formik.resetForm();
+      return () => {
+        unsubscribe, unsubscribe1;
+      };
     }, []),
   );
+
+  useEffect(() => {
+    if (!query.fetchQuery) {
+      if (query.send.sql == QUERY_STORE.SELECT) {
+        let rows = query.res.rows;
+        if (rows.length > 0) {          
+          setStore(rows.item(0))
+        } else {
+          setStore(null);          
+        }
+      }
+    }
+  }, [query]);
 
   function showPasswordDialog() {
     setPasswordDialog(true);
@@ -91,11 +120,11 @@ function Other() {
       {passwordDialog && (
         <ScrollView>
           {formList.map((item, index) => (
-            <View style={_s.fieldContainer} key={index}>
-              <Text style={_s.fieldHeaderText}>{item.value}</Text>
-              <View style={{marginHorizontal: 10}}>
+            <View style={_style.fieldContainer} key={index}>
+              <Text style={_style.fieldHeaderText}>{item.value}</Text>
+              <View style={_style.mx10}>
                 <TextInput
-                  style={_s.fieldText}
+                  style={_style.fieldText}
                   contextMenuHidden={true}
                   key={index}
                   onChangeText={formik.handleChange(item.key)}
@@ -110,16 +139,17 @@ function Other() {
                   <ErrorText text={formik.errors[item.key]} />
                 ) : null}
               </View>
-              <Text style={_s.hint}>You need password to use this menu</Text>              
+              <Text style={_style.hint}>You need password to use this menu</Text>              
             </View>
           ))}          
         </ScrollView>
       )}
+      <View style={_style.flex1}>
       {!passwordDialog && (     
         menuList.map((item, index)=>(
-          <TouchableHighlight key={index} style={{paddingVertical: 15,}} onPress={()=>navigation.navigate(index == 0 ? 'OtherHistory' : 'ChangePassword')} underlayColor="#eee">
-            <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20,}}>
-              <View style={{flex: 1,}}>
+          <TouchableHighlight key={index} style={_style.py15} onPress={()=>navigation.navigate(index == 0 ? 'OtherHistory' : 'OtherDatabaseReport')} underlayColor="#eee">
+            <View style={[_style.rowDirectionCenter, _style.px20]}>
+              <View style={_style.flex1}>
                 <Text style={_style.listItemHeaderText}>{item}</Text>
               </View>
               <AntDesignIcon name="right" size={20} color="#888" />
@@ -127,6 +157,7 @@ function Other() {
           </TouchableHighlight>
         ))           
       )}
+      </View>
     </Container>
   );
 }

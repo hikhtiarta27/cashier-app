@@ -9,8 +9,8 @@
     "test": "jest",
     "lint": "eslint .",
     "emulator": "cd ~/Library/Android/sdk/emulator && ./emulator -avd Nexus_7_API_30",
-    "android:reset": "adb shell \"pm uninstall com.cashier\" ",
-    "release": "cd android && ./gradlew assembleRelease"
+    "android:reset": "adb shell \"pm uninstall com.cashier\" && npm run android",
+    "android:release": "cd android && ./gradlew assembleRelease"
   },
   "dependencies": {
     "@react-native-community/async-storage": "^1.12.1",
@@ -21,9 +21,11 @@
     "@react-navigation/drawer": "^5.12.5",
     "@react-navigation/native": "^5.9.4",
     "@react-navigation/stack": "^5.14.5",
+    "axios": "^0.21.1",
     "formik": "^2.2.9",
     "react": "17.0.1",
     "react-native": "0.64.2",
+    "react-native-bluetooth-escpos-printer": "0.0.5",
     "react-native-document-picker": "^5.2.0",
     "react-native-fs": "^2.18.0",
     "react-native-gesture-handler": "^1.10.3",

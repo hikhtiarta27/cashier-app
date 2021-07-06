@@ -5,7 +5,7 @@ import Button from '../../../components/Button';
 import Header from '../../../components/Header';
 import {Formik, useFormik} from 'formik';
 import * as Yup from 'yup';
-import _style from '../../../styles/Typrograhpy';
+import _style from '../../../styles/';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useDispatch } from 'react-redux';
 import { queryFetch } from '../../database/DBAction';
@@ -76,14 +76,14 @@ function MasterCategoryEdit() {
         name="Master Category Edit"
         submitBtn
         submitBtnFunc={formik.handleSubmit}
-        submitBtnName="Save"
+        submitBtnName="Submit"
       />
       {formList.map((item, index) => (
-        <View style={_s.fieldContainer} key={index}>
-          <Text style={_s.fieldHeaderText}>{item.value}</Text>
-          <View style={{marginHorizontal: 10}}>
+        <View style={_style.fieldContainer} key={index}>
+          <Text style={_style.fieldHeaderText}>{item.value}</Text>
+          <View style={_style.mx10}>
             <TextInput
-              style={_s.fieldText}
+              style={_style.fieldText}
               key={index}
               editable={item.key == 'code' || item.key == 'created_date' ? false : true}
               selectTextOnFocus={item.key == 'code' || item.key == 'created_date' ? false : true}
@@ -98,24 +98,5 @@ function MasterCategoryEdit() {
     </Container>
   );
 }
-
-const _s = StyleSheet.create({
-  fieldContainer: {
-    paddingHorizontal: 10,
-    marginVertical: 10,    
-  },
-  fieldHeaderText: {
-    ..._style.bodyText,
-    paddingHorizontal: 10,
-    color: "#888"
-  },
-  fieldText: {
-    ..._style.listItemHeaderText,
-    paddingHorizontal: 0,
-    borderBottomColor: '#eee',
-    borderBottomWidth: 1,
-    fontSize: 16,
-  },
-});
 
 export default MasterCategoryEdit;

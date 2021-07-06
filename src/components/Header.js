@@ -1,70 +1,167 @@
-import React, {useEffect} from 'react'
+import React, {memo, useCallback, useEffect, useMemo, useState} from 'react';
 import {
   View,
   TouchableOpacity,
   Text,
-  StyleSheet
-} from 'react-native'
+  StyleSheet,
+  Alert,
+  Animated,
+  Easing,
+} from 'react-native';
 import _style from '../styles';
-import PropTypes from 'prop-types'
-import AntDesignIcon from 'react-native-vector-icons/AntDesign'
-import OctoIcon from 'react-native-vector-icons/Octicons'
-import {useNavigation} from '@react-navigation/native'
-import { useDispatch } from 'react-redux';
-import { queryFetch } from '../modules/database/DBAction';
+import PropTypes from 'prop-types';
+import AntDesignIcon from 'react-native-vector-icons/AntDesign';
+import OctoIcon from 'react-native-vector-icons/Octicons';
+import {useFocusEffect, useNavigation} from '@react-navigation/native';
+import {useDispatch, useSelector} from 'react-redux';
+import {queryFetch} from '../modules/database/DBAction';
+import {setLoading} from '../modules/master/MasterAction';
+import {QUERY_TRX_DETAIL, QUERY_TRX_HEADER} from '../config/StaticQuery';
+import {apiRequest, apiRequestAxios} from '../util';
+import { runSqlQuery } from '../modules/database/DBSaga';
 
-function Header(props){
+function Header(props) {
+  const user = useSelector(state => state.user);
+  const query = useSelector(state => state.query);
+  const db = useSelector(state => state.database);
 
-  const navigation = useNavigation()
-  const dispatch = useDispatch()
+  const navigation = useNavigation();
+  const dispatch = useDispatch();  
+  const [trxHeaderList, setTrxHeaderList] = useState([]);
+  const [trxDetailList, setTrxDetailList] = useState([]);
 
-  function goBack(){
-    navigation.goBack()
+  function goBack() {
+    navigation.goBack();
   }
 
-  function toggleDrawer(){
-    navigation.toggleDrawer()
+  function toggleDrawer() {
+    navigation.toggleDrawer();
+  }  
+
+  useEffect(async () => {
+    if (!query.fetchQuery) {
+      if (query.send.sql == QUERY_TRX_DETAIL.UPDATE_FLAG_Y_ALL) {        
+        await dispatch(setLoading(false));                   
+      }
+      if (query.send.sql == QUERY_TRX_HEADER.UPDATE_FLAG_Y_ALL) {        
+        await dispatch(setLoading(false));                   
+      }
+    }
+  }, [query]);
+
+  useEffect(async () => {
+    if (trxHeaderList.length != 0) {
+      await apiRequestAxios(
+        user.store.api_url + '/transactionHeader/batch',
+        'POST',
+        {data: trxHeaderList},
+      ).then(res => {              
+        
+      });
+      await dispatch(
+        queryFetch({
+          sql: QUERY_TRX_HEADER.UPDATE_FLAG_Y_ALL,
+        }),
+      );      
+    }
+  }, [trxHeaderList]);
+
+  useEffect(async () => {
+    if (trxDetailList.length != 0) {
+      await apiRequestAxios(
+        user.store.api_url + '/transactionDetail/batch',
+        'POST',
+        {data: trxDetailList},
+      ).then(res => {              
+        
+      });
+      await dispatch(
+        queryFetch({
+          sql: QUERY_TRX_DETAIL.UPDATE_FLAG_Y_ALL,
+        }),
+      );      
+    }
+  }, [trxDetailList]);
+
+  function syncFunc() {
+    Alert.alert('Confirmation', 'Are you to synchronize the data?', [
+      {
+        text: 'NO',
+        style: 'cancel',
+      },
+      {
+        text: 'YES',
+        style: 'default',
+        onPress: async () => {
+          await dispatch(setLoading(true));
+          await getTrxHeaderList()
+          await getTrxDetailList()
+        },
+      },
+    ]);
   }
 
-  // useEffect(() => {
-  //   const unsubscribe = navigation.addListener('drawerClose', (e) => {
-  //     // Do something
-  //     dispatch(queryFetch({
-  //       sql: "",
-  //     }))
-  //   });
-  
-  //   return unsubscribe;
-  // }, [navigation]);
+  async function getTrxHeaderList(){  
+    let result = await runSqlQuery(db.database, QUERY_TRX_HEADER.SELECT_ALL)  
+    let rows = result.rows;
+    if (rows.length > 0) {
+      let resultList = [];
+      for (let i = 0; i < rows.length; i++) {
+        if(rows.item(i).flag == 'Y') continue
+        await resultList.push(rows.item(i));
+      }               
+      setTrxHeaderList(resultList);          
+    }    
+  }
+
+  async function getTrxDetailList(){  
+    let result = await runSqlQuery(db.database, QUERY_TRX_DETAIL.SELECT_ALL)  
+    let rows = result.rows;
+    if (rows.length > 0) {
+      let resultList = [];
+      for (let i = 0; i < rows.length; i++) {
+        if(rows.item(i).flag == 'Y') continue
+        await resultList.push(rows.item(i));
+      }               
+      setTrxDetailList(resultList);          
+    }    
+  }
 
   return (
     <View style={_s.container}>
-      {props.backBtn ? 
+      {props.backBtn ? (
         <TouchableOpacity style={_s.btnContainer} onPress={goBack}>
-          <AntDesignIcon name="arrowleft" size={20} color={"#000"}/>
+          <AntDesignIcon name="arrowleft" size={20} color={'#000'} />
         </TouchableOpacity>
-      : null}
-      {props.drawerBtn ? 
+      ) : null}
+      {props.drawerBtn ? (
         <TouchableOpacity style={_s.btnContainer} onPress={toggleDrawer}>
-          <OctoIcon name="three-bars" size={20} color={"#000"}/>
+          <OctoIcon name="three-bars" size={20} color={'#000'} />
         </TouchableOpacity>
-      : null}      
-      <Text style={[_style.h6, {flex: 1,}]}>
-        {props.name}
-      </Text>
-      {props.submitBtn? 
+      ) : null}
+      <Text style={[_style.h6, _style.flex1]}>{props.name}</Text>
+      {props.syncBtn ? (
+        <TouchableOpacity style={_s.btnContainer} onPress={syncFunc}>
+          <OctoIcon name="sync" size={20} color={'#000'} />
+        </TouchableOpacity>
+      ) : null}
+      {props.submitBtn ? (
         <TouchableOpacity style={_s.btnContainer} onPress={props.submitBtnFunc}>
-          {props.submitBtnComponent ? props.submitBtnComponent : <Text style={_s.btnSubmitText}>{props.submitBtnName}</Text>}
+          {props.submitBtnComponent ? (
+            props.submitBtnComponent
+          ) : (
+            <Text style={_s.btnSubmitText}>{props.submitBtnName}</Text>
+          )}
         </TouchableOpacity>
-      : null}
+      ) : null}
     </View>
   );
 }
 
 const _s = StyleSheet.create({
-  container:{
+  container: {
     // ..._style.my10,
-    ..._style.px10,    
+    ..._style.px10,
     paddingTop: 15,
     paddingBottom: 15,
     flexDirection: 'row',
@@ -77,20 +174,20 @@ const _s = StyleSheet.create({
     // shadowOpacity: 0.25,
     // shadowRadius: 3.84,
     // elevation: 5,
-    borderBottomColor: "#eee",
+    borderBottomColor: '#eee',
     borderBottomWidth: 1,
-    backgroundColor: "#fff"
+    backgroundColor: '#fff',
   },
-  btnContainer:{
+  btnContainer: {
     ..._style.mr10,
     paddingHorizontal: 8,
-    paddingVertical: 5,  
+    paddingVertical: 5,
   },
-  btnSubmitText:{
-    color: '#68BBE3',    
-    ..._style.btnText
-  }
-})
+  btnSubmitText: {
+    color: '#68BBE3',
+    ..._style.btnText,
+  },
+});
 
 Header.propTypes = {
   backBtn: PropTypes.bool,
@@ -99,7 +196,7 @@ Header.propTypes = {
   submitBtn: PropTypes.bool,
   submitBtnFunc: PropTypes.func,
   submitBtnName: PropTypes.string,
-  submitBtnComponent: PropTypes.element
-}
+  submitBtnComponent: PropTypes.element,
+};
 
-export default Header;
+export default memo(Header);

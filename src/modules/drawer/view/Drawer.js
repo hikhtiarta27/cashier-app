@@ -13,16 +13,21 @@ import {createDrawerNavigator} from '@react-navigation/drawer';
 import TransactionHistory from '../../transaction/view/TransactionHistory';
 import MasterItemEdit from '../../master/view/MasterItemEdit';
 import InvoiceEdit from '../../transaction/view/InvoiceEdit';
-import { useDispatch } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import {dbClose, dbFetch, queryFetch} from '../../database/DBAction'
-import {QUERY_CATEGORY, QUERY_ITEM, QUERY_TRX_HEADER, QUERY_TRX_DETAIL} from '../../../config/StaticQuery'
+import {QUERY_CATEGORY, QUERY_STORE, QUERY_ITEM, QUERY_TRX_HEADER, QUERY_TRX_DETAIL} from '../../../config/StaticQuery'
 import {
   Animated
 } from 'react-native'
 
 import Other from '../../other/view/Other';
 import OtherHistory from '../../other/view/OtherHistory';
-import ChangePassword from '../../other/view/ChangePassword';
+import OtherDatabaseReport from '../../other/view/OtherDatabaseReport';
+
+import MasterStore from '../../master/view/MasterStore';
+import { runSqlQuery } from '../../database/DBSaga';
+import MasterStoreEdit from '../../master/view/MasterStoreEdit';
+import { setStore } from '../../master/MasterAction';
 
 
 
@@ -47,6 +52,15 @@ function MasterItemStack(){
   );
 }
 
+function MasterStoreStack(){
+  return(
+    <Stack.Navigator headerMode={false} initialRouteName="MasterStore">
+      <Stack.Screen component={MasterStore} name="MasterStore" />
+      <Stack.Screen component={MasterStoreEdit} name="MasterStoreEdit" />
+    </Stack.Navigator>
+  );
+}
+
 function TransactionStack(){
   return(
     <Stack.Navigator headerMode={false} initialRouteName="Transaction">
@@ -60,8 +74,9 @@ function OtherStack(){
   return(
     <Stack.Navigator headerMode={false} initialRouteName="Other">
       <Stack.Screen component={Other} name="Other" />
-      <Stack.Screen component={OtherHistory} name="OtherHistory" />
-      <Stack.Screen component={ChangePassword} name="ChangePassword" />
+      <Stack.Screen component={OtherHistory} name="OtherHistory" />      
+      <Stack.Screen component={OtherDatabaseReport} name="OtherDatabaseReport" />      
+
     </Stack.Navigator>
   );
 }
@@ -85,11 +100,15 @@ function DrawerTab() {
       <Drawer.Screen component={MasterItemStack} name="MasterItem" options={{
         headerShown: false,
         drawerLabel: "Master Item"
+      }}/>
+      <Drawer.Screen component={MasterStoreStack} name="MasterStore" options={{
+        headerShown: false,
+        drawerLabel: "Master Store"
       }}/>      
       <Drawer.Screen component={Setting} name="Setting" options={{
         headerShown: false,
-        drawerLabel: "Setting"
-      }}/>
+        drawerLabel: "Printer Settings"
+      }}/>      
       <Drawer.Screen component={OtherStack} name="Other" options={{
         headerShown: false,
         drawerLabel: "Other"
@@ -100,25 +119,30 @@ function DrawerTab() {
 
 function SwithRouter() {
   
+  const db = useSelector(state => state.database)
+  const query = useSelector(state => state.query)
   const [fade, setFade] = useState(new Animated.Value(0))
   const dispatch = useDispatch()
   const [loading, setLoading] = useState(true)
 
-  useEffect(()=>{    
-    dispatch(dbFetch())
-    dispatch(queryFetch({
+  useEffect(async()=>{    
+    await dispatch(dbFetch())    
+    await dispatch(queryFetch({
       sql: QUERY_CATEGORY.CREATE_TABLE
     }))
-    dispatch(queryFetch({
+    await dispatch(queryFetch({
       sql: QUERY_ITEM.CREATE_TABLE
-    }))
-    dispatch(queryFetch({
+    }))    
+    await dispatch(queryFetch({
       sql: QUERY_TRX_HEADER.CREATE_TABLE
     }))
-    dispatch(queryFetch({
+    await dispatch(queryFetch({
       sql: QUERY_TRX_DETAIL.CREATE_TABLE
     }))
-
+    await dispatch(queryFetch({
+      sql: QUERY_STORE.CREATE_TABLE
+    }))
+    
     Animated.timing(fade, {
       toValue: 1,
       duration: 4000,
@@ -127,6 +151,27 @@ function SwithRouter() {
         setLoading(!loading)
     });     
   }, [])  
+
+  useEffect(async()=>{
+    if(!query.fetchQuery && !db.fetchDb){            
+      if(query.send != null && query.send.sql == QUERY_STORE.CREATE_TABLE){                        
+        let data = await checkIfAlreadyOneRowInStore()        
+        if(data.rows.length == 0){          
+          dispatch(queryFetch({
+            sql: QUERY_STORE.INSERT,
+            param: ["DEFAULT_ID", "DEFAULT_NAME", "ADMIN", "https://posapp30.herokuapp.com/api"]
+          }))                    
+          dispatch(setStore({"id": "DEFAULT_ID", "name": "DEFAULT_NAME", "password": "ADMIN", "api_url": "https://posapp30.herokuapp.com/api"}))
+        }else{
+          dispatch(setStore(data.rows.item(0)))
+        }
+      }                           
+    }
+  }, [query, db.fetchDb])
+
+  function checkIfAlreadyOneRowInStore(){    
+    return runSqlQuery(db.database, QUERY_STORE.SELECT)
+  }
 
   return (
     <Stack.Navigator headerMode={false} initialRouteName="App">      

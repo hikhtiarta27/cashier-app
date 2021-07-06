@@ -18,8 +18,9 @@ import Button from '../../../components/Button';
 import Header from '../../../components/Header';
 import DocumentPicker from 'react-native-document-picker';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
-import _s from '../Styles'
+import _s from '../Styles';
 import _style from '../../../styles';
+import { dateTimeToFormat } from '../../../util';
 
 function MasterCategory() {
   const query = useSelector(state => state.query);
@@ -27,7 +28,7 @@ function MasterCategory() {
   const navigation = useNavigation();
   const [categoryList, setCategoryList] = useState([]);
   const [category, setCategory] = useState({});
-  const [dataTableFocus, setDataTableFocus] = useState(0)
+  const [dataTableFocus, setDataTableFocus] = useState(0);
 
   const headerTable = [
     {
@@ -83,24 +84,23 @@ function MasterCategory() {
 
   //get updated data
   useEffect(() => {
-    if(!query.fetchQuery){
+    if (!query.fetchQuery) {
       if (query.send.sql == QUERY_CATEGORY.SELECT) {
         let rows = query.res.rows;
         if (rows.length > 0) {
           let resultList = [];
           for (let i = 0; i < rows.length; i++) {
             resultList.push(rows.item(i));
-          }        
+          }
           setCategory(resultList[0]);
           setCategoryList(resultList);
-          setDataTableFocus(0)
+          setDataTableFocus(0);
         } else {
           setCategory(null);
           setCategoryList([]);
         }
       }
     }
-    
   }, [query]);
 
   async function importData() {
@@ -125,8 +125,10 @@ function MasterCategory() {
             {
               text: 'Yes',
               onPress: async () => {
+                let today = dateTimeToFormat(new Date())
                 await apiDeleteCategoryList();
                 for (let i = 1; i < dataParse.length; i++) {
+                  dataParse[i].push(today)
                   await apiInsertCategoryList(dataParse[i]);
                 }
                 await apiGetCategoryList();
@@ -135,7 +137,7 @@ function MasterCategory() {
                   'Master Category successfully imported!',
                   [
                     {
-                      text: 'Ok',                      
+                      text: 'Ok',
                       style: 'default',
                     },
                   ],
@@ -162,16 +164,19 @@ function MasterCategory() {
     return (
       <TouchableHighlight
         key={index}
-        style={[_s.listContainer, dataTableFocus == index ? {backgroundColor: "#eee"} : null]}
+        style={[
+          _style.rowTable,
+          dataTableFocus == index ? {backgroundColor: '#eee'} : null,
+        ]}
         onPress={() => {
-          setCategory(item)
-          setDataTableFocus(index)
+          setCategory(item);
+          setDataTableFocus(index);
         }}
         underlayColor="#eee">
         <>
           {headerTable.map((v, i) => (
-            <View key={i} style={{flex: 1}}>
-              <Text style={_s.listText}>{item[v.key]}</Text>
+            <View key={i} style={_style.flex1}>
+              <Text style={_style.rowTableText}>{item[v.key]}</Text>
             </View>
           ))}
         </>
@@ -181,10 +186,10 @@ function MasterCategory() {
 
   function categoryHeaderRender() {
     return (
-      <View style={_s.headerContainer}>
+      <View style={_style.headerTable}>
         {headerTable.map((item, index) => (
-          <View key={index} style={{flex: 1}}>
-            <Text style={_s.headerText}>{item.value}</Text>
+          <View key={index} style={_style.flex1}>
+            <Text style={_style.headerTableText}>{item.value}</Text>
           </View>
         ))}
       </View>
@@ -194,8 +199,8 @@ function MasterCategory() {
   return (
     <Container>
       <Header drawerBtn={true} name="Master Category" />
-      <View style={_s.flexRow}>
-        <View style={{flex: 2, borderRightColor: '#eee', borderRightWidth: 3}}>
+      <View style={_style.flexRow}>
+        <View style={[_style.flex2, _style.tableSeparator]}>
           <FlatList
             ListHeaderComponent={categoryHeaderRender}
             showsVerticalScrollIndicator={false}
@@ -207,42 +212,42 @@ function MasterCategory() {
           />
           <Button btnText="Import" onPress={importData} />
         </View>
-        <View style={{flex: 1}}>
-          {category != null ? (
-            <>
-              <View style={{flex: 1}}>
-                <View style={_s.categoryDetailContainer}>
-                  <Text style={_s.categoryDetailText}>Category Detail</Text>
+        <View style={_style.flex1}>
+          <View style={_style.flex1}>
+            <View style={_style.categoryDetailContainer}>
+              <Text style={_style.categoryDetailText}>Category Detail</Text>
+            </View>
+            {headerTable.map((item, index) => (
+              <View key={index} style={_style.categoryDetailChildContainer}>
+                <View style={_style.flex1}>
+                  <Text
+                    style={[
+                      _style.categoryDetailChildText,
+                      _style.listItemHeaderText,
+                    ]}>
+                    {item.value}
+                  </Text>
                 </View>
-                {headerTable.map((item, index) => (
-                  <View key={index} style={_s.categoryDetailChildContainer}>
-                    <View style={{flex: 1}}>
-                      <Text
-                        style={[
-                          _s.categoryDetailChildText,
-                          _style.listItemHeaderText,
-                        ]}>
-                        {item.value}
-                      </Text>
-                    </View>
-                    <View>
-                      <Text style={_s.categoryDetailChildText}>
-                        {category[item.key]}
-                      </Text>
-                    </View>
+                {category != null && (
+                  <View>
+                    <Text style={_style.categoryDetailChildText}>
+                      {category[item.key]}
+                    </Text>
                   </View>
-                ))}
+                )}
               </View>
-              <View>
-                <Button
-                  btnText="edit"
-                  onPress={() =>
-                    navigation.navigate('MasterCategoryEdit', category)
-                  }
-                />
-              </View>
-            </>
-          ) : null}
+            ))}
+          </View>
+          {category != null && (
+            <View>
+              <Button
+                btnText="edit"
+                onPress={() =>
+                  navigation.navigate('MasterCategoryEdit', category)
+                }
+              />
+            </View>
+          )}
         </View>
       </View>
     </Container>
