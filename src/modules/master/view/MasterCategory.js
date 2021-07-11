@@ -11,7 +11,6 @@ import {
 import {writeFile, readFile} from 'react-native-fs';
 import {useDispatch, useSelector} from 'react-redux';
 import XLSX from 'xlsx';
-import {queryFetch} from '../../database/DBAction';
 import {QUERY_CATEGORY} from '../../../config/StaticQuery';
 import Container from '../../../components/Container';
 import Button from '../../../components/Button';
@@ -22,6 +21,7 @@ import _s from '../Styles';
 import _style from '../../../styles';
 import { dateTimeToFormat } from '../../../util';
 import { setCategoryItemFetch } from '../MasterAction';
+import { apiBatchSql, apiDeleteCategory, apiGetCategoryList } from '../../../config/Api';
 
 function MasterCategory() {
   const query = useSelector(state => state.query);
@@ -46,43 +46,18 @@ function MasterCategory() {
     },
   ];
 
-  function apiGetCategoryList() {
-    dispatch(
-      queryFetch({
-        sql: QUERY_CATEGORY.SELECT,
-      }),
-    );
-  }
-
-  function apiInsertCategoryList(param) {
-    dispatch(
-      queryFetch({
-        sql: QUERY_CATEGORY.INSERT,
-        param: param,
-      }),
-    );
-  }
-
-  function apiDeleteCategoryList() {
-    dispatch(
-      queryFetch({
-        sql: QUERY_CATEGORY.DELETE,
-      }),
-    );
-  }
-
   function getCategoryItemFromDb(){
     dispatch(setCategoryItemFetch())
   }
 
   //api call only run once
   useEffect(() => {
-    apiGetCategoryList();
+    apiGetCategoryList(dispatch);
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      const unsubscribe = apiGetCategoryList();
+      const unsubscribe = apiGetCategoryList(dispatch)
       const unsubscribe1 = getCategoryItemFromDb();      
       return () => {
         unsubscribe,
@@ -135,18 +110,16 @@ function MasterCategory() {
               text: 'Yes',
               onPress: async () => {
                 let today = dateTimeToFormat(new Date())
-                await apiDeleteCategoryList();
+                await apiDeleteCategory(dispatch);
                 let listSql = []                
                 for (let i = 1; i < dataParse.length; i++) {
                   let sql = `INSERT INTO master_category (code, name, created_date) VALUES ('${dataParse[i][0]}', '${dataParse[i][1]}', '${today}')`
                   await listSql.push(sql)                  
-                }                
-                dispatch(queryFetch({
-                  sql: "INSERT_BATCH",
-                  param: listSql
-                }))
-
-                await apiGetCategoryList();
+                }    
+                
+                apiBatchSql(dispatch, listSql)
+                            
+                await apiGetCategoryList(dispatch)
                 getCategoryItemFromDb()
                 Alert.alert(
                   'Information',

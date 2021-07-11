@@ -13,7 +13,6 @@ import {
 import {writeFile, readFile} from 'react-native-fs';
 import {useDispatch, useSelector} from 'react-redux';
 import XLSX from 'xlsx';
-import {queryFetch} from '../../database/DBAction';
 import {QUERY_ITEM, QUERY_CATEGORY} from '../../../config/StaticQuery';
 import Container from '../../../components/Container';
 import Button from '../../../components/Button';
@@ -25,6 +24,7 @@ import {dateTimeToFormat, stringToCurrency} from '../../../util';
 import AntDesignIcon from 'react-native-vector-icons/AntDesign';
 import Modal from 'react-native-modal';
 import { setCategoryItemFetch } from '../MasterAction';
+import { apiBatchSql, apiDeleteItem, apiGetCategoryList, apiGetItemList, apiGetItemListByCategoryCode } from '../../../config/Api';
 
 function MasterItem() {
   const query = useSelector(state => state.query);
@@ -69,61 +69,18 @@ function MasterItem() {
     },
   ];
 
-  function apiGetCategoryList() {
-    dispatch(
-      queryFetch({
-        sql: QUERY_CATEGORY.SELECT,
-      }),
-    );
-  }
-
-
-  function apiGetItemsList() {
-    dispatch(
-      queryFetch({
-        sql: QUERY_ITEM.SELECT,
-      }),
-    );
-  }
-
-  function apiDeleteItemsList() {
-    dispatch(
-      queryFetch({
-        sql: QUERY_ITEM.DELETE,
-      }),
-    );
-  }
-
-  function apiInsertItemsList(param) {
-    dispatch(
-      queryFetch({
-        sql: QUERY_ITEM.INSERT,
-        param: param,
-      }),
-    );
-  }
-
-  function apiGetItemListByCategoryCode(param) {
-    dispatch(
-      queryFetch({
-        sql: QUERY_ITEM.SELECT_BY_CATEGORY_CODE,
-        param: param,
-      }),
-    );
-  }
-
   function getCategoryItemFromDb(){
     dispatch(setCategoryItemFetch())
   }
 
   //api call only run once
   useEffect(() => {
-    apiGetItemsList();    
+    apiGetItemList(dispatch);    
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      const unsubscribe = apiGetItemsList();
+      const unsubscribe = apiGetItemList(dispatch);
       const unsubscribe1 = getCategoryItemFromDb();      
       return () => {
         unsubscribe,
@@ -146,7 +103,7 @@ function MasterItem() {
           setItemsList(resultList);
           setItemListBackup(resultList);
           setDataTableFocus(0);
-          apiGetCategoryList();
+          apiGetCategoryList(dispatch);
         } else {
           setItems(null);
           setItemsList([]);
@@ -196,17 +153,16 @@ function MasterItem() {
               text: 'Yes',
               onPress: async () => {
                 let today = dateTimeToFormat(new Date())
-                await apiDeleteItemsList();
+                await apiDeleteItem(dispatch);
                 let listSql = []                
                 for (let i = 1; i < dataParse.length; i++) {
                   let sql = `INSERT INTO master_item (code, category_code, name, price, discount, created_date) VALUES ('${dataParse[i][0]}', '${dataParse[i][1]}', '${dataParse[i][2]}', ${dataParse[i][3]}, ${dataParse[i][4]}, '${today}')`
                   await listSql.push(sql)                  
-                }                
-                dispatch(queryFetch({
-                  sql: "INSERT_BATCH",
-                  param: listSql
-                }))
-                await apiGetItemsList();
+                }  
+                
+                apiBatchSql(dispatch,listSql)
+                                
+                await apiGetItemList(dispatch);
                 getCategoryItemFromDb()
                 Alert.alert(
                   'Information',
@@ -283,9 +239,9 @@ function MasterItem() {
     if(filterCategoryText != ""){
       let param = []
       param.push(filterCategoryText)
-      apiGetItemListByCategoryCode(param)
+      apiGetItemListByCategoryCode(dispatch)
     }else{
-      apiGetItemsList()
+      apiGetItemList(dispatch)
     }
 
     setFilterVisible(!filterVisible)

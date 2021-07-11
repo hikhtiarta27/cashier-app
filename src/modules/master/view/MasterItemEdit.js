@@ -8,19 +8,18 @@ import {
   ScrollView,
 } from 'react-native';
 import Container from '../../../components/Container';
-import Button from '../../../components/Button';
 import Header from '../../../components/Header';
-import {Formik, useFormik} from 'formik';
+import {useFormik} from 'formik';
 import * as Yup from 'yup';
 import _style from '../../../styles';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {useDispatch, useSelector} from 'react-redux';
-import {queryFetch} from '../../database/DBAction';
 import {QUERY_CATEGORY, QUERY_ITEM} from '../../../config/StaticQuery';
 import {Picker} from '@react-native-picker/picker';
 import ErrorText from '../../../components/ErrorText';
 import {TextInputMask} from 'react-native-masked-text';
 import { currencyToInteger } from '../../../util';
+import { apiGetCategoryList, apiUpdateItem } from '../../../config/Api';
 
 const itemsScheme = Yup.object().shape({
   code: Yup.string().required('Required'),
@@ -73,7 +72,7 @@ function MasterItemEdit() {
   const [categoryList, setCategoryList] = useState([]);
 
   useEffect(() => {
-    apiGetCategoryList();
+    apiGetCategoryList(dispatch);
   }, []);
 
   useEffect(() => {
@@ -90,14 +89,6 @@ function MasterItemEdit() {
       }
     }
   }, [query]);
-
-  function apiGetCategoryList() {
-    dispatch(
-      queryFetch({
-        sql: QUERY_CATEGORY.SELECT,
-      }),
-    );
-  }
 
   const formik = useFormik({
     initialValues: {
@@ -116,7 +107,7 @@ function MasterItemEdit() {
       param.push(currencyToInteger(values.price));
       param.push(currencyToInteger(values.discount));
       param.push(values.code);
-      await apiUpdateItems(param);
+      await apiUpdateItem(dispatch, param);
       Alert.alert('Information', 'Master Items successfully updated!', [
         {
           text: 'Ok',
@@ -126,15 +117,6 @@ function MasterItemEdit() {
       ]);
     },
   });
-
-  function apiUpdateItems(param) {
-    dispatch(
-      queryFetch({
-        sql: QUERY_ITEM.UPDATE,
-        param,
-      }),
-    );
-  }
 
   return (
     <Container>

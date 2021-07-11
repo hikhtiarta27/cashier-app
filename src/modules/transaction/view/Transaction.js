@@ -11,12 +11,10 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
-import {queryFetch} from '../../database/DBAction';
 import {
   QUERY_CATEGORY,
   QUERY_ITEM,
   QUERY_TRX_HEADER,
-  QUERY_TRX_DETAIL,
 } from '../../../config/StaticQuery';
 import Container from '../../../components/Container';
 import Header from '../../../components/Header';
@@ -44,6 +42,7 @@ import Modal from 'react-native-modal';
 import {TextInputMask} from 'react-native-masked-text';
 import {setLoading} from '../../master/MasterAction';
 import {
+  apiBatchSql,
   apiDeleteTrxDetailByTrxHeaderId,
   apiGetCategoryList,
   apiInsertTrxHeader,
@@ -130,11 +129,7 @@ function Transaction() {
     },
   ];
 
-  useEffect(async () => {
-    // let param = [];
-    // param.push(category.code);
-    // apiGetItemsList(param);
-    // console.log(category)
+  useEffect(async () => {    
     if (
       category != null &&
       category.items != null &&
@@ -182,8 +177,7 @@ function Transaction() {
   }, [transaction.historyCartList, transaction.historyCartListHeader]);
 
   useFocusEffect(
-    useCallback(() => {
-      apiGetCategoryList(dispatch);
+    useCallback(() => {      
       const unsubscribe = getCategoryItemFromStoreMaster();
       const onBackPress = e => {
         if (transaction.historyCartListHeader != null) {
@@ -503,17 +497,6 @@ function Transaction() {
     setItemsList(newArray);
   }
 
-  function apiDeleteToTrxDetailBy(param) {
-    {
-      dispatch(
-        queryFetch({
-          sql: QUERY_TRX_DETAIL.DELETE_BY_TRX_HEADER_ID,
-          param,
-        }),
-      );
-    }
-  }
-
   function showAlertBayarAndSimpan(status) {
     Alert.alert(
       'Confirmation',
@@ -575,12 +558,7 @@ function Transaction() {
         await listSql.push(sql);
       }
 
-      dispatch(
-        queryFetch({
-          sql: 'INSERT_BATCH',
-          param: listSql,
-        }),
-      );
+      apiBatchSql(dispatch, listSql)    
 
       dispatch(setHistoryCartList(null));
       dispatch(setHistoryCartListHeader(null));
@@ -595,7 +573,7 @@ function Transaction() {
       paramHeader.push(user.store.id);
       paramHeader.push(user.store.name);
       paramHeader.push('N');
-      await apiInsertTrxHeader(paramHeader);
+      await apiInsertTrxHeader(dispatch, paramHeader);
 
       let lastId = await apiGetLastIdTrxHeader();
       lastId = lastId.rows.item(0).id;
@@ -619,13 +597,8 @@ function Transaction() {
           user.store.name
         }', 'N')`;
         await listSql.push(sql);
-      }
-      dispatch(
-        queryFetch({
-          sql: 'INSERT_BATCH',
-          param: listSql,
-        }),
-      );
+      }      
+      apiBatchSql(dispatch, listSql)
     }
 
     if (status == 'BAYAR') {

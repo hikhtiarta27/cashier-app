@@ -12,13 +12,13 @@ import _style from '../styles';
 import PropTypes from 'prop-types';
 import AntDesignIcon from 'react-native-vector-icons/AntDesign';
 import OctoIcon from 'react-native-vector-icons/Octicons';
-import {useFocusEffect, useNavigation} from '@react-navigation/native';
+import {useNavigation} from '@react-navigation/native';
 import {useDispatch, useSelector} from 'react-redux';
-import {queryFetch} from '../modules/database/DBAction';
-import {setCategoryItemFetch, setLoading} from '../modules/master/MasterAction';
+import { setLoading} from '../modules/master/MasterAction';
 import {QUERY_TRX_DETAIL, QUERY_TRX_HEADER} from '../config/StaticQuery';
-import {apiRequest, apiRequestAxios} from '../util';
+import { apiRequestAxios} from '../util';
 import {runSqlQuery} from '../modules/database/DBSaga';
+import { apiUpdateTrxDetailFlagToY, apiUpdateTrxHeaderFlagToY } from '../config/Api';
 
 function Header(props) {
   const user = useSelector(state => state.user);
@@ -56,11 +56,7 @@ function Header(props) {
         data: trxHeaderList,
       })
         .then(res => {
-          dispatch(
-            queryFetch({
-              sql: QUERY_TRX_HEADER.UPDATE_FLAG_Y_ALL,
-            }),
-          );
+          apiUpdateTrxHeaderFlagToY(dispatch)          
         })
         .catch(err => {
           dispatch(setLoading(false));
@@ -76,9 +72,7 @@ function Header(props) {
       })
         .then(res => {
           dispatch(
-            queryFetch({
-              sql: QUERY_TRX_DETAIL.UPDATE_FLAG_Y_ALL,
-            }),
+            apiUpdateTrxDetailFlagToY(dispatch)            
           );
         })
         .catch(err => {

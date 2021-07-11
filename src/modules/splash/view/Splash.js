@@ -6,8 +6,6 @@ import _style from '../../../styles/';
 
 function Splash() {
   const [fade, setFade] = useState(new Animated.Value(0));
-  // const navigation = useNavigation();
-  // const dispatch = useDispatch()
 
   useEffect(() => {
     Animated.timing(fade, {

@@ -1,17 +1,15 @@
 import React, { useState } from 'react';
 import {View, TextInput, Text, StyleSheet, Alert, ScrollView} from 'react-native';
 import Container from '../../../components/Container';
-import Button from '../../../components/Button';
 import Header from '../../../components/Header';
-import {Formik, useFormik} from 'formik';
+import {useFormik} from 'formik';
 import * as Yup from 'yup';
 import _style from '../../../styles';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useDispatch } from 'react-redux';
-import { queryFetch } from '../../database/DBAction';
-import { QUERY_STORE } from '../../../config/StaticQuery';
 import ErrorText from '../../../components/ErrorText';
 import { setStore } from '../MasterAction';
+import { apiDeleteStore, apiInsertStore } from '../../../config/Api';
 
 const storeScheme = Yup.object().shape({
   id: Yup.string().required('Required'),
@@ -63,8 +61,8 @@ function MasterStoreEdit() {
         param.push(values.name)
         param.push(values.password)
         param.push(values.api_url)
-        await apiDeleteStore()
-        await apiInsertStore(param)
+        await apiDeleteStore(dispatch)
+        await apiInsertStore(dispatch, param)
         await setStore(param)
         Alert.alert("Information", "Master Store successfully updated!", 
           [
@@ -78,23 +76,6 @@ function MasterStoreEdit() {
       }      
     },
   });
-
-  function apiInsertStore(param) {
-    dispatch(
-      queryFetch({
-        sql: QUERY_STORE.INSERT,
-        param: param,
-      }),
-    );
-  }
-
-  function apiDeleteStore() {
-    dispatch(
-      queryFetch({
-        sql: QUERY_STORE.DELETE,
-      }),
-    );
-  }
 
   return (
     <Container>

@@ -22,8 +22,8 @@ import AntDesignIcon from 'react-native-vector-icons/AntDesign'
 import _style from '../../../styles';
 import { useNavigation } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
-import { queryFetch } from '../../database/DBAction';
 import { QUERY_STORE } from '../../../config/StaticQuery';
+import { apiGetStore } from '../../../config/Api';
 
 const otherScheme = Yup.object().shape({
   password: Yup.string().required('Required'),
@@ -61,22 +61,14 @@ function Other() {
     },
   });
 
-  function apiGetStoreList() {
-    dispatch(
-      queryFetch({
-        sql: QUERY_STORE.SELECT,
-      }),
-    );
-  }
-
   useEffect(async() => {
     await showPasswordDialog();
-    await apiGetStoreList();
+    await apiGetStore(dispatch);
   }, []);
 
   useFocusEffect(
     useCallback(() => {      
-      const unsubscribe = apiGetStoreList();
+      const unsubscribe = apiGetStore(dispatch);
       const unsubscribe1 = showPasswordDialog();
       formik.resetForm();
       return () => {

@@ -1,5 +1,5 @@
-import React, {useEffect, useState} from 'react';
-import {View, TextInput, Text, StyleSheet, ScrollView} from 'react-native';
+import React, { useState} from 'react';
+import {View, TextInput, Text, ScrollView} from 'react-native';
 import Container from '../../../components/Container';
 import Button from '../../../components/Button';
 import Header from '../../../components/Header';
@@ -47,11 +47,9 @@ const formList = [
   },
 ];
 
-function InvoiceEdit() {
-  const query = useSelector(state => state.query);
+function InvoiceEdit() {  
   const route = useRoute();
-  const [items, setItems] = useState(route.params.item);
-  const dispatch = useDispatch();
+  const [items, setItems] = useState(route.params.item);  
   const navigation = useNavigation();
   const [deleted, setDeleted] = useState(false);
 

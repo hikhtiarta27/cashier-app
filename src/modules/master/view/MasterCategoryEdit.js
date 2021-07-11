@@ -1,15 +1,13 @@
 import React, { useState } from 'react';
 import {View, TextInput, Text, StyleSheet, Alert} from 'react-native';
 import Container from '../../../components/Container';
-import Button from '../../../components/Button';
 import Header from '../../../components/Header';
 import {Formik, useFormik} from 'formik';
 import * as Yup from 'yup';
 import _style from '../../../styles/';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useDispatch } from 'react-redux';
-import { queryFetch } from '../../database/DBAction';
-import { QUERY_CATEGORY } from '../../../config/StaticQuery';
+import { apiUpdateCategory } from '../../../config/Api';
 
 const categoryScheme = Yup.object().shape({
   code: Yup.string().required('Required'),
@@ -49,7 +47,7 @@ function MasterCategoryEdit() {
       let param = []     
       param.push(values.name) 
       param.push(values.code)
-      await apiUpdateCategory(param)
+      await apiUpdateCategory(dispatch, param)
       Alert.alert("Information", "Master Category successfully updated!", 
         [
           {
@@ -61,13 +59,6 @@ function MasterCategoryEdit() {
       )
     },
   });
-
-  function apiUpdateCategory(param){
-    dispatch(queryFetch({
-      sql: QUERY_CATEGORY.UPDATE,
-      param
-    }))
-  }
   
 
   return (

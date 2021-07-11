@@ -3,21 +3,15 @@ import {
   View,
   Text,
   FlatList,
-  TouchableOpacity,
   ScrollView,
   TouchableHighlight,
-  Alert,
   TextInput
 } from 'react-native';
-import {writeFile, readFile} from 'react-native-fs';
 import {useDispatch, useSelector} from 'react-redux';
-import XLSX from 'xlsx';
-import {queryFetch} from '../../database/DBAction';
 import {QUERY_STORE} from '../../../config/StaticQuery';
 import Container from '../../../components/Container';
 import Button from '../../../components/Button';
 import Header from '../../../components/Header';
-import DocumentPicker from 'react-native-document-picker';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import _s from '../Styles';
 import _style from '../../../styles/';
@@ -25,6 +19,7 @@ import ErrorText from '../../../components/ErrorText';
 import {useFormik} from 'formik';
 import * as Yup from 'yup';
 import {setStore as setStoreAction} from '../MasterAction'
+import { apiGetStore } from '../../../config/Api';
 
 const formList = [
   {
@@ -79,23 +74,15 @@ function MasterStore() {
     }
   ];
 
-  function apiGetStoreList() {
-    dispatch(
-      queryFetch({
-        sql: QUERY_STORE.SELECT,
-      }),
-    );
-  }
-
   //api call only run once
   useEffect(async () => {
     await showPasswordDialog();
-    await apiGetStoreList();
+    await apiGetStore(dispatch);
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      const unsubscribe = apiGetStoreList();
+      const unsubscribe = apiGetStore(dispatch);
       const unsubscribe1 = showPasswordDialog();
       formik.resetForm();
       return () => {

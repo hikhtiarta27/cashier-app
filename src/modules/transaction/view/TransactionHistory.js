@@ -1,17 +1,15 @@
-import React, {memo, useCallback, useEffect, useRef, useState} from 'react';
+import React, { useCallback, useEffect, useState} from 'react';
 import {
   View,
   Text,
   FlatList,
   TouchableOpacity,
-  ScrollView,
   StyleSheet,
   TouchableHighlight,
   Alert,
   RefreshControl,
 } from 'react-native';
 import {useDispatch, useSelector} from 'react-redux';
-import {queryFetch} from '../../database/DBAction';
 import {QUERY_TRX_DETAIL, QUERY_TRX_HEADER} from '../../../config/StaticQuery';
 import Container from '../../../components/Container';
 import Button from '../../../components/Button';
@@ -34,12 +32,12 @@ import Modal from 'react-native-modal';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {dateTimeToFormat, printInvoice, apiRequestAxios} from '../../../util';
 import {setLoading} from '../../master/MasterAction';
+import { apiGetTrxDetailByTrxHeaderId, apiGetTrxHeaderByDate, apiGetTrxHeaderByDateBetween, apiInsertTrxHeaderVoid, apiUpdateTrxDetailFlagToY, apiUpdateTrxHeaderFlagToY, apiUpdateTrxHeaderStatus } from '../../../config/Api';
 
 function TransactionHistory() {
   const user = useSelector(state => state.user);
   const db = useSelector(state => state.database);
   const query = useSelector(state => state.query);
-  const route = useRoute();
   const dispatch = useDispatch();
   const navigation = useNavigation();
   const [historyList, setHistoryList] = useState([]);
@@ -123,11 +121,7 @@ function TransactionHistory() {
         {data: trxHeaderList},
       )
         .then(res => {
-          dispatch(
-            queryFetch({
-              sql: QUERY_TRX_HEADER.UPDATE_FLAG_Y_ALL,
-            }),
-          );
+          apiUpdateTrxHeaderFlagToY(dispatch)
         })
         .catch(err => {
           
@@ -143,11 +137,7 @@ function TransactionHistory() {
         {data: trxDetailList},
       )
       .then(res =>{
-        dispatch(
-          queryFetch({
-            sql: QUERY_TRX_DETAIL.UPDATE_FLAG_Y_ALL,
-          }),
-        );
+        apiUpdateTrxDetailFlagToY(dispatch)      
       })
       .catch(err => {
         
@@ -223,7 +213,7 @@ function TransactionHistory() {
       param.push(
         history.ref_void_id != null ? history.ref_void_id : history.id,
       );
-      apiGetTrxDetail(param);
+      apiGetTrxDetailByTrxHeaderId(dispatch, param);
     }
   }, [history.id, refreshCartList]);
 
@@ -265,9 +255,9 @@ function TransactionHistory() {
           ? `%${filterStatus[filterStatusFocus].toUpperCase()}%`
           : '%%',
       );
-      await apiGetByDateBetween(param);
+      await apiGetTrxHeaderByDateBetween(dispatch, param);
     } else {
-      await apiGetByDate(param);
+      await apiGetTrxHeaderByDate(dispatch, param);
     }
 
     if (filterStatusFocus != 0) setCounterFilter(1);
@@ -341,15 +331,6 @@ function TransactionHistory() {
     }
   }, [query.fetchQuery]);
 
-  function apiGetTrxDetail(param) {
-    dispatch(
-      queryFetch({
-        sql: QUERY_TRX_DETAIL.SELECT_BY_TRX_HEADER_ID,
-        param,
-      }),
-    );
-  }
-
   function hapusInvoice() {
     Alert.alert(
       'Confirmation',
@@ -366,7 +347,7 @@ function TransactionHistory() {
             param.push('HAPUS');
             param.push('E');
             param.push(history.id);
-            await apiUpdateStatus(param);
+            await apiUpdateTrxHeaderStatus(dispatch, param);
             await runApiGetByDate();
             Alert.alert('Information', 'Transaction successfully deleted!', [
               {
@@ -381,24 +362,6 @@ function TransactionHistory() {
       {
         cancelable: false,
       },
-    );
-  }
-
-  function apiUpdateStatus(param) {
-    dispatch(
-      queryFetch({
-        sql: QUERY_TRX_HEADER.UPDATE_STATUS,
-        param,
-      }),
-    );
-  }
-
-  function apiInsertToTrxHeaderVoid(param) {
-    dispatch(
-      queryFetch({
-        sql: QUERY_TRX_HEADER.INSERT_VOID,
-        param,
-      }),
     );
   }
 
@@ -418,7 +381,7 @@ function TransactionHistory() {
             param.push('VOID');
             param.push('E');
             param.push(history.id);
-            await apiUpdateStatus(param);
+            await apiUpdateTrxHeaderStatus(dispatch, param);
 
             let today = new Date();
             let currentDateTimeFormatted = dateTimeToFormat(today);
@@ -438,7 +401,7 @@ function TransactionHistory() {
             paramHeader.push(user.store.id);
             paramHeader.push(user.store.name);
             paramHeader.push('N');
-            await apiInsertToTrxHeaderVoid(paramHeader);
+            await apiInsertTrxHeaderVoid(dispatch, paramHeader);
             await runApiGetByDate();
             Alert.alert('Information', 'Transaction successfully voided!', [
               {
@@ -453,24 +416,6 @@ function TransactionHistory() {
       {
         cancelable: false,
       },
-    );
-  }
-
-  function apiGetByDate(param) {
-    dispatch(
-      queryFetch({
-        sql: QUERY_TRX_HEADER.SELECT_BY_DATE,
-        param,
-      }),
-    );
-  }
-
-  function apiGetByDateBetween(param) {
-    dispatch(
-      queryFetch({
-        sql: QUERY_TRX_HEADER.SELECT_BY_DATE_BETWEEN,
-        param,
-      }),
     );
   }
 
