@@ -69,8 +69,8 @@ export const QUERY_TRX_HEADER = {
   INSERT_VOID:
     'INSERT INTO trx_header (date, discount, grand_total, status, ref_void_id, created_date, store_id, store_name, flag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
   // SELECT: "SELECT trx_header.*, COUNT( CASE WHEN trx_detail.flag != 'D' THEN 1 ELSE NULL END) total_item FROM trx_header LEFT JOIN trx_detail ON trx_detail.trx_header_id=trx_header.id WHERE trx_header.status LIKE ? GROUP BY trx_header.id ORDER BY trx_header.created_date DESC",
-  SELECT_BY_DATE: "SELECT trx_header.*, COUNT( CASE WHEN trx_detail.flag != 'D' THEN 1 ELSE NULL END) total_item FROM trx_header LEFT JOIN trx_detail ON trx_detail.trx_header_id=trx_header.id where DATE(trx_header.date) = ? AND trx_header.status LIKE ?  GROUP BY trx_header.id ORDER BY trx_header.created_date DESC",
-  SELECT_BY_DATE_BETWEEN: "SELECT trx_header.*, COUNT( CASE WHEN trx_detail.flag != 'D' THEN 1 ELSE NULL END) total_item FROM trx_header LEFT JOIN trx_detail ON trx_detail.trx_header_id=trx_header.id where DATE(trx_header.date) > ? AND DATE(trx_header.date) < ? AND trx_header.status LIKE ?  GROUP BY trx_header.id ORDER BY trx_header.created_date DESC",
+  SELECT_BY_DATE: "SELECT trx_header.*, COUNT( CASE WHEN trx_detail.flag != 'D' THEN 1 ELSE NULL END) total_item FROM trx_header LEFT JOIN trx_detail ON trx_detail.trx_header_id=trx_header.id where DATE(trx_header.date) = ? AND trx_header.status LIKE ?  GROUP BY trx_header.id ORDER BY trx_header.date DESC",
+  SELECT_BY_DATE_BETWEEN: "SELECT trx_header.*, COUNT( CASE WHEN trx_detail.flag != 'D' THEN 1 ELSE NULL END) total_item FROM trx_header LEFT JOIN trx_detail ON trx_detail.trx_header_id=trx_header.id where DATE(trx_header.date) > ? AND DATE(trx_header.date) < ? AND trx_header.status LIKE ?  GROUP BY trx_header.id ORDER BY trx_header.date DESC",
   // SELECT_BY_ID: 'SELECT * FROM trx_header where id = ?',
   // DELETE: 'DELETE FROM trx_header WHERE id = ?',
   UPDATE: 'UPDATE trx_header SET date = ?, discount = ?, grand_total = ?, status = ?, flag = ? WHERE id = ?',
@@ -78,6 +78,7 @@ export const QUERY_TRX_HEADER = {
   // TRUNCATE: 'DELETE FROM trx_header',
   UPDATE_STATUS: 'UPDATE trx_header SET status = ?, flag = ? WHERE id = ?',  
   SELECT_ALL: 'SELECT * FROM trx_header',
+  SELECT_ALL_FLAG_NOT_Y: `SELECT * FROM trx_header where flag != 'Y'`,
   UPDATE_FLAG_Y_ALL: "UPDATE trx_header SET flag = 'Y'"
 };
 
@@ -101,6 +102,7 @@ export const QUERY_TRX_DETAIL = {
   INSERT:
     'INSERT INTO trx_detail (trx_header_id, item_code, item_name, price, discount, quantity, total, created_date, store_id, store_name, flag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
   SELECT_ALL: 'SELECT * FROM trx_detail',
+  SELECT_ALL_FLAG_NOT_Y: `SELECT * FROM trx_detail WHERE flag != 'Y'`,
   // SELECT_BY_ID: 'SELECT * FROM trx_detail where id = ?',
   SELECT_BY_TRX_HEADER_ID: "SELECT * FROM trx_detail where trx_header_id = ? AND flag !=  'D'",
   // DELETE: 'DELETE FROM trx_detail WHERE id = ?',

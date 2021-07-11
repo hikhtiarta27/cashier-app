@@ -21,6 +21,7 @@ import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import _s from '../Styles';
 import _style from '../../../styles';
 import { dateTimeToFormat } from '../../../util';
+import { setCategoryItemFetch } from '../MasterAction';
 
 function MasterCategory() {
   const query = useSelector(state => state.query);
@@ -70,6 +71,10 @@ function MasterCategory() {
     );
   }
 
+  function getCategoryItemFromDb(){
+    dispatch(setCategoryItemFetch())
+  }
+
   //api call only run once
   useEffect(() => {
     apiGetCategoryList();
@@ -78,7 +83,11 @@ function MasterCategory() {
   useFocusEffect(
     useCallback(() => {
       const unsubscribe = apiGetCategoryList();
-      return () => unsubscribe;
+      const unsubscribe1 = getCategoryItemFromDb();      
+      return () => {
+        unsubscribe,
+        unsubscribe1
+      };
     }, []),
   );
 
@@ -127,11 +136,18 @@ function MasterCategory() {
               onPress: async () => {
                 let today = dateTimeToFormat(new Date())
                 await apiDeleteCategoryList();
+                let listSql = []                
                 for (let i = 1; i < dataParse.length; i++) {
-                  dataParse[i].push(today)
-                  await apiInsertCategoryList(dataParse[i]);
-                }
+                  let sql = `INSERT INTO master_category (code, name, created_date) VALUES ('${dataParse[i][0]}', '${dataParse[i][1]}', '${today}')`
+                  await listSql.push(sql)                  
+                }                
+                dispatch(queryFetch({
+                  sql: "INSERT_BATCH",
+                  param: listSql
+                }))
+
                 await apiGetCategoryList();
+                getCategoryItemFromDb()
                 Alert.alert(
                   'Information',
                   'Master Category successfully imported!',

@@ -69,7 +69,7 @@ function OtherHistory() {
       value: 'Trx No',
     },
     {
-      key: 'created_date',
+      key: 'date',
       value: 'Trx Date',
     },
     {
@@ -107,7 +107,7 @@ function OtherHistory() {
       key: 'total',
       value: 'Disc/Total',
     },
-  ];  
+  ];
 
   //api call only run once
   useEffect(async () => {
@@ -141,7 +141,7 @@ function OtherHistory() {
     setFilterItemModalFocus(filterItemFocus);
   }, [filterItemFocus, filterStatusFocusPrev, dateFilterPrev]);
 
-  function runApiGetByDate() {
+  async function runApiGetByDate() {
     let today = new Date();
 
     if (filterItem[filterItemFocus] == 'Kemarin') {
@@ -174,15 +174,15 @@ function OtherHistory() {
           ? `%${filterStatus[filterStatusFocus].toUpperCase()}%`
           : '%%',
       );
-      apiGetByDateBetween(param);
+      await apiGetByDateBetween(param);
     } else {
-      apiGetByDate(param);
+      await apiGetByDate(param);
     }
-  
+
     if (filterStatusFocus != 0) setCounterFilter(1);
     if (filterItemFocus != 0) setCounterFilter(1);
     if (filterItemFocus == 0 && filterStatusFocus == 0) setCounterFilter(0);
-    if (filterItemFocus != 0 && filterStatusFocus != 0) setCounterFilter(2);    
+    if (filterItemFocus != 0 && filterStatusFocus != 0) setCounterFilter(2);
   }
 
   function apiGetTotalItemByRefVoidId(param) {
@@ -206,19 +206,21 @@ function OtherHistory() {
           let sumGrandTotal = 0;
           let sumTotalDiscount = 0;
           for (let i = 0; i < rows.length; i++) {
-            let item = rows.item(i)
+            let item = rows.item(i);
             if (item.ref_void_id != null) {
               let param = [];
               param.push(item.ref_void_id);
               let totalItem = await apiGetTotalItemByRefVoidId(param);
               item.total_item = totalItem.rows.item(0).total_item;
             }
-            sumGrandTotal += (item.status == 'BAYAR' ? parseInt(item.grand_total) : 0)
-            sumTotalDiscount += (item.status == 'BAYAR' ? parseInt(item.discount) : 0) 
+            sumGrandTotal +=
+              item.status == 'BAYAR' ? parseInt(item.grand_total) : 0;
+            sumTotalDiscount +=
+              item.status == 'BAYAR' ? parseInt(item.discount) : 0;
             await resultList.push(item);
           }
-          setSumGrandTotal(sumGrandTotal)
-          setSumTotalDiscount(sumTotalDiscount)
+          setSumGrandTotal(sumGrandTotal);
+          setSumTotalDiscount(sumTotalDiscount);
           setHistory(resultList[0]);
           setRefreshCartList(!refreshCartList);
           setHistoryList(resultList);
@@ -235,7 +237,7 @@ function OtherHistory() {
         if (rows.length > 0) {
           let resultList = [];
           for (let i = 0; i < rows.length; i++) {
-            let item = rows.item(i)
+            let item = rows.item(i);
             resultList.push(item);
           }
           setCartList(resultList);
@@ -426,12 +428,11 @@ function OtherHistory() {
       <View key={index} style={[_style.rowTable]}>
         <>
           {headerTableCartList.map((v, i) => (
-            <View
-              key={i}
-              style={_style.flexRowCenter}>
+            <View key={i} style={_style.flexRowCenter}>
               {v.key == 'name' ? (
                 <View style={_style.flex1}>
-                  <Text style={[_style.rowTableText, _style.listItemHeaderText]}>
+                  <Text
+                    style={[_style.rowTableText, _style.listItemHeaderText]}>
                     {item.item_name}
                   </Text>
                 </View>
@@ -537,8 +538,7 @@ function OtherHistory() {
         onBackdropPress={cancelFilter}
         onBackButtonPress={cancelFilter}>
         <View style={[_style.flex1, _style.bgWhite]}>
-          <View
-            style={[_style.rowDirectionCenter, _style.px15, _style.pt15]}>
+          <View style={[_style.rowDirectionCenter, _style.px15, _style.pt15]}>
             <TouchableOpacity onPress={cancelFilter}>
               <AntDesignIcon
                 name="close"
@@ -558,7 +558,9 @@ function OtherHistory() {
                   // setFilterStatusFocusPrev(filterStatusFocus)
                   setFilterStatusFocus(0);
                 }}>
-                <Text style={[_style.modalHeader, {color: '#68BBE3'}]}>Reset</Text>
+                <Text style={[_style.modalHeader, {color: '#68BBE3'}]}>
+                  Reset
+                </Text>
               </TouchableOpacity>
             )}
           </View>
@@ -671,14 +673,18 @@ function OtherHistory() {
             </View>
           </TouchableOpacity>
         ))}
-        <View style={_style.rowDirectionCenter}>
-        <View style={_style.flexEnd}>
-              <Text style={_style.listItemHeaderText}>Grand Total : {stringToCurrency(sumGrandTotal)}</Text>
-            </View>
-            <View style={_style.flexEnd}>
-              <Text style={_style.listItemHeaderText}>Total Discount : {stringToCurrency(sumTotalDiscount)}</Text>
-            </View>
-        </View>        
+        <View style={_style.flexRowCenter}>
+          <View style={_style.flexEnd}>
+            <Text style={_style.listItemHeaderText}>
+              Grand Total : {stringToCurrency(sumGrandTotal)}
+            </Text>
+          </View>
+          <View style={_style.flexEnd}>
+            <Text style={_style.listItemHeaderText}>
+              Total Discount : {stringToCurrency(sumTotalDiscount)}
+            </Text>
+          </View>
+        </View>
       </View>
       <View style={_style.flexRow}>
         <View style={[_style.flex2, _style.tableSeparator]}>
@@ -690,7 +696,7 @@ function OtherHistory() {
             extraData={historyList}
             keyExtractor={(item, index) => index}
             stickyHeaderIndices={[0]}
-          />          
+          />
         </View>
         <View style={_style.flex1}>
           {history != null ? (
@@ -706,10 +712,7 @@ function OtherHistory() {
                 />
               </View>
               <View
-                style={[
-                  _style.totalHeaderContainer,
-                  _style.tableSeparatorTop,
-                ]}>
+                style={[_style.totalHeaderContainer, _style.tableSeparatorTop]}>
                 <View style={_style.flex1}>
                   <Text style={_style.totalHeaderText}>Discount</Text>
                 </View>
@@ -731,8 +734,7 @@ function OtherHistory() {
               </View>
               {history.status == 'SIMPAN' ? (
                 <View style={_style.rowDirection}>
-                  <View
-                    style={[_style.tableSeparator, _style.flex1]}>
+                  <View style={[_style.tableSeparator, _style.flex1]}>
                     <Button btnText="Hapus" onPress={hapusInvoice} />
                   </View>
                   <View style={_style.flex1}>
@@ -749,11 +751,13 @@ function OtherHistory() {
               ) : history.status == 'BAYAR' ? (
                 <View style={_style.rowDirection}>
                   <View style={[_style.tableSeparator, _style.flex1]}>
-                        <Button btnText="VOID" onPress={voidInvoice} />
-                    
+                    <Button btnText="VOID" onPress={voidInvoice} />
                   </View>
                   <View style={_style.flex1}>
-                    <Button btnText="RE-PRINT" onPress={()=>console.log("Reprint process")} />
+                    <Button
+                      btnText="RE-PRINT"
+                      onPress={() => console.log('Reprint process')}
+                    />
                   </View>
                 </View>
               ) : null}
@@ -765,7 +769,7 @@ function OtherHistory() {
   );
 }
 
-const _s = StyleSheet.create({  
+const _s = StyleSheet.create({
   pilihTanggalContainer: {
     // marginTop: 10,
     paddingVertical: 8,

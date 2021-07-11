@@ -17,7 +17,7 @@ function Container(props){
   return (
     <View style={_s.container}>            
       {props.children}
-      {user.store.name == "DEFAULT_NAME" && <View style={_s.storeContainer}>
+      {user.store != null && user.store.name == "DEFAULT_NAME" && <View style={_s.storeContainer}>
         <Text style={_s.storeConfig}>You need to change store configuration in Master Store Menu</Text>
       </View>}
 

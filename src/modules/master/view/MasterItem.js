@@ -24,6 +24,7 @@ import DocumentPicker from 'react-native-document-picker';
 import {dateTimeToFormat, stringToCurrency} from '../../../util';
 import AntDesignIcon from 'react-native-vector-icons/AntDesign';
 import Modal from 'react-native-modal';
+import { setCategoryItemFetch } from '../MasterAction';
 
 function MasterItem() {
   const query = useSelector(state => state.query);
@@ -111,6 +112,10 @@ function MasterItem() {
     );
   }
 
+  function getCategoryItemFromDb(){
+    dispatch(setCategoryItemFetch())
+  }
+
   //api call only run once
   useEffect(() => {
     apiGetItemsList();    
@@ -118,8 +123,12 @@ function MasterItem() {
 
   useFocusEffect(
     useCallback(() => {
-      const unsubscribe = apiGetItemsList();      
-      return () => unsubscribe;
+      const unsubscribe = apiGetItemsList();
+      const unsubscribe1 = getCategoryItemFromDb();      
+      return () => {
+        unsubscribe,
+        unsubscribe1
+      };
     }, []),
   );
 
@@ -188,11 +197,17 @@ function MasterItem() {
               onPress: async () => {
                 let today = dateTimeToFormat(new Date())
                 await apiDeleteItemsList();
+                let listSql = []                
                 for (let i = 1; i < dataParse.length; i++) {
-                  dataParse[i].push(today)
-                  await apiInsertItemsList(dataParse[i]);
-                }
+                  let sql = `INSERT INTO master_item (code, category_code, name, price, discount, created_date) VALUES ('${dataParse[i][0]}', '${dataParse[i][1]}', '${dataParse[i][2]}', ${dataParse[i][3]}, ${dataParse[i][4]}, '${today}')`
+                  await listSql.push(sql)                  
+                }                
+                dispatch(queryFetch({
+                  sql: "INSERT_BATCH",
+                  param: listSql
+                }))
                 await apiGetItemsList();
+                getCategoryItemFromDb()
                 Alert.alert(
                   'Information',
                   'Master Item successfully imported!',

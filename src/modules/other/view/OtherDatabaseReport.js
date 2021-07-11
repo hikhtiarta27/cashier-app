@@ -8,6 +8,7 @@ import {
   StyleSheet,
   TouchableHighlight,
   TextInput,
+  Alert
 } from 'react-native';
 import {useDispatch, useSelector} from 'react-redux';
 import Container from '../../../components/Container';
@@ -26,12 +27,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import {dateTimeToFormat} from '../../../util';
 
 function OtherDatabaseReport() {
-  const user = useSelector(state => state.user);
-  const db = useSelector(state => state.database);
-  const query = useSelector(state => state.query);
-  const route = useRoute();
-  const dispatch = useDispatch();
-  const navigation = useNavigation();
+  const user = useSelector(state => state.user);  
   const [historyList, setHistoryList] = useState([]);
   const [history, setHistory] = useState({});
   const [cartList, setCartList] = useState([]);
@@ -215,6 +211,9 @@ function OtherDatabaseReport() {
         await setHistoryList([]);
         await setCartList([]);
       }
+    })
+    .catch(err =>{
+      console.error(err.message)
     });
   }
 
@@ -255,6 +254,9 @@ function OtherDatabaseReport() {
         await setHistoryList([]);
         await setCartList([]);
       }
+    })
+    .catch(err =>{
+      console.error(err.message)
     });
   }
 

@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {memo, useCallback, useEffect, useRef, useState} from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   StyleSheet,
   TouchableHighlight,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import {useDispatch, useSelector} from 'react-redux';
 import {queryFetch} from '../../database/DBAction';
@@ -72,7 +73,7 @@ function TransactionHistory() {
       value: 'Trx No',
     },
     {
-      key: 'created_date',
+      key: 'date',
       value: 'Trx Date',
     },
     {
@@ -116,63 +117,73 @@ function TransactionHistory() {
 
   useEffect(async () => {
     if (trxHeaderList.length != 0) {
-      await apiRequestAxios(
+      apiRequestAxios(
         user.store.api_url + '/transactionHeader/batch',
         'POST',
         {data: trxHeaderList},
-      ).then(res => {});
-      await dispatch(
-        queryFetch({
-          sql: QUERY_TRX_HEADER.UPDATE_FLAG_Y_ALL,
-        }),
-      );
+      )
+        .then(res => {
+          dispatch(
+            queryFetch({
+              sql: QUERY_TRX_HEADER.UPDATE_FLAG_Y_ALL,
+            }),
+          );
+        })
+        .catch(err => {
+          
+        });      
     }
   }, [trxHeaderList]);
 
   useEffect(async () => {
     if (trxDetailList.length != 0) {
-      await apiRequestAxios(
+      apiRequestAxios(
         user.store.api_url + '/transactionDetail/batch',
         'POST',
         {data: trxDetailList},
-      ).then(res => {});
-      await dispatch(
-        queryFetch({
-          sql: QUERY_TRX_DETAIL.UPDATE_FLAG_Y_ALL,
-        }),
-      );
+      )
+      .then(res =>{
+        dispatch(
+          queryFetch({
+            sql: QUERY_TRX_DETAIL.UPDATE_FLAG_Y_ALL,
+          }),
+        );
+      })
+      .catch(err => {
+        
+      });      
     }
   }, [trxDetailList]);
 
-  async function syncFunc() {
+  function syncFunc() {
     // await dispatch(setLoading(true));
-    await getTrxHeaderList();
-    await getTrxDetailList();
+    getTrxHeaderList();
+    getTrxDetailList();
   }
 
   async function getTrxHeaderList() {
-    let result = await runSqlQuery(db.database, QUERY_TRX_HEADER.SELECT_ALL);
+    let result = await runSqlQuery(db.database, QUERY_TRX_HEADER.SELECT_ALL_FLAG_NOT_Y);
     let rows = result.rows;
     if (rows.length > 0) {
       let resultList = [];
       for (let i = 0; i < rows.length; i++) {
-        if (rows.item(i).flag == 'Y') continue;
-        await resultList.push(rows.item(i));
+        // if (rows.item(i).flag == 'Y') continue;
+        resultList.push(rows.item(i));
       }
-      console.log("Header List: ")
-      console.log(resultList)
+      console.log('Header List: ');
+      console.log(resultList);
       setTrxHeaderList(resultList);
     }
   }
 
   async function getTrxDetailList() {
-    let result = await runSqlQuery(db.database, QUERY_TRX_DETAIL.SELECT_ALL);
+    let result = await runSqlQuery(db.database, QUERY_TRX_DETAIL.SELECT_ALL_FLAG_NOT_Y);
     let rows = result.rows;
     if (rows.length > 0) {
       let resultList = [];
       for (let i = 0; i < rows.length; i++) {
-        if (rows.item(i).flag == 'Y') continue;
-        await resultList.push(rows.item(i));
+        // if (rows.item(i).flag == 'Y') continue;
+        resultList.push(rows.item(i));
       }
       setTrxDetailList(resultList);
     }
@@ -183,33 +194,36 @@ function TransactionHistory() {
   //api call only run once
   useEffect(async () => {
     // await apiGetHistoryList();
-    console.log("Run once")
+    console.log('Run once');
     // await syncFunc();
     await runApiGetByDate();
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      console.log("On focus")      
+      console.log('On focus');
+      setHistoryList([])
+      setHistory({})
+      setCartList([])
       const unsubscribe = syncFunc();
       const unsubscribe1 = runApiGetByDate();
       setFilterItemFocus(0);
       setFilterStatusFocus(0);
       setFilterStatusFocusPrev(0);
-      return () =>  {
-        unsubscribe,
-        unsubscribe1
-      };      
-    }, []),  
-  );  
+      return () => {
+        unsubscribe, unsubscribe1;
+      };
+    }, []),
+  );
 
   useEffect(async () => {
     if (history.id != undefined) {
+      console.log("RUNNNNNNN")
       let param = [];
       param.push(
         history.ref_void_id != null ? history.ref_void_id : history.id,
       );
-      await apiGetTrxDetail(param);
+      apiGetTrxDetail(param);
     }
   }, [history.id, refreshCartList]);
 
@@ -300,6 +314,7 @@ function TransactionHistory() {
           setHistory({});
           setHistoryList([]);
         }
+        dispatch(setLoading(false))
       }
 
       if (query.send.sql == QUERY_TRX_DETAIL.SELECT_BY_TRX_HEADER_ID) {
@@ -499,16 +514,14 @@ function TransactionHistory() {
         ))}
       </View>
     );
-  }
+  }    
 
-  function dataRenderCartList({item, index}) {
+  function dataRenderCartList({item, index}) {    
     return (
       <View key={index} style={[_style.rowTable]}>
         <>
           {headerTableCartList.map((v, i) => (
-            <View
-              key={i}
-              style={_style.flexRowCenter}>
+            <View key={i} style={_style.flexRowCenter}>
               {v.key == 'name' ? (
                 <View style={_style.flex1}>
                   <Text style={[_style.rowTableText, _font.listItemHeaderText]}>
@@ -637,6 +650,11 @@ function TransactionHistory() {
     }
   }
 
+  function handleRefresh(){
+    dispatch(setLoading(true))
+    runApiGetByDate()
+  }
+
   return (
     <Container>
       <Header drawerBtn={true} name="Transaction History" />
@@ -655,8 +673,7 @@ function TransactionHistory() {
         onBackdropPress={cancelFilter}
         onBackButtonPress={cancelFilter}>
         <View style={[_style.flex1, _style.bgWhite]}>
-          <View
-            style={[_style.rowDirectionCenter, _style.px15, _style.pt15]}>
+          <View style={[_style.rowDirectionCenter, _style.px15, _style.pt15]}>
             <TouchableOpacity onPress={cancelFilter}>
               <AntDesignIcon
                 name="close"
@@ -676,7 +693,9 @@ function TransactionHistory() {
                   // setFilterStatusFocusPrev(filterStatusFocus)
                   setFilterStatusFocus(0);
                 }}>
-                <Text style={[_style.modalHeader, {color: '#68BBE3'}]}>Reset</Text>
+                <Text style={[_style.modalHeader, {color: '#68BBE3'}]}>
+                  Reset
+                </Text>
               </TouchableOpacity>
             )}
           </View>
@@ -792,7 +811,15 @@ function TransactionHistory() {
       </View>
       <View style={_style.flexRow}>
         <View style={[_style.flex2, _style.tableSeparator]}>
+          {/* HISTORY LIST */}
           <FlatList
+            refreshControl={
+              <RefreshControl 
+                refreshing={user.loading}
+                onRefresh={handleRefresh}
+              />
+            }
+            removeClippedSubviews={true}
             ListHeaderComponent={historyHeaderRender}
             showsVerticalScrollIndicator={false}
             renderItem={dataRender}
@@ -806,20 +833,18 @@ function TransactionHistory() {
           {history != null ? (
             <>
               <View style={_style.flex1}>
-                <FlatList
+                <FlatList                  
                   ListHeaderComponent={cartListHeaderRender}
                   showsVerticalScrollIndicator={false}
                   renderItem={dataRenderCartList}
                   data={cartList}
+                  extraData={cartList}
                   keyExtractor={(item, index) => index}
                   stickyHeaderIndices={[0]}
                 />
               </View>
               <View
-                style={[
-                  _style.totalHeaderContainer,
-                  _style.tableSeparatorTop,
-                ]}>
+                style={[_style.totalHeaderContainer, _style.tableSeparatorTop]}>
                 <View style={_style.flex1}>
                   <Text style={_style.totalHeaderText}>Discount</Text>
                 </View>
@@ -841,8 +866,7 @@ function TransactionHistory() {
               </View>
               {history.status == 'SIMPAN' ? (
                 <View style={_style.rowDirection}>
-                  <View
-                    style={[_style.tableSeparator, _style.flex1]}>
+                  <View style={[_style.tableSeparator, _style.flex1]}>
                     <Button btnText="Hapus" onPress={hapusInvoice} />
                   </View>
                   <View style={_style.flex1}>
@@ -858,8 +882,7 @@ function TransactionHistory() {
                 </View>
               ) : history.status == 'BAYAR' ? (
                 <View style={_style.rowDirection}>
-                  <View
-                    style={[_style.tableSeparator, _style.flex1]}>
+                  <View style={[_style.tableSeparator, _style.flex1]}>
                     <Button btnText="VOID" onPress={voidInvoice} />
                   </View>
                   <View style={_style.flex1}>
@@ -875,7 +898,7 @@ function TransactionHistory() {
   );
 }
 
-const _s = StyleSheet.create({  
+const _s = StyleSheet.create({
   pilihTanggalContainer: {
     // marginTop: 10,
     paddingVertical: 8,

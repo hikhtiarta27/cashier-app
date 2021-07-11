@@ -15,10 +15,10 @@ import OctoIcon from 'react-native-vector-icons/Octicons';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import {useDispatch, useSelector} from 'react-redux';
 import {queryFetch} from '../modules/database/DBAction';
-import {setLoading} from '../modules/master/MasterAction';
+import {setCategoryItemFetch, setLoading} from '../modules/master/MasterAction';
 import {QUERY_TRX_DETAIL, QUERY_TRX_HEADER} from '../config/StaticQuery';
 import {apiRequest, apiRequestAxios} from '../util';
-import { runSqlQuery } from '../modules/database/DBSaga';
+import {runSqlQuery} from '../modules/database/DBSaga';
 
 function Header(props) {
   const user = useSelector(state => state.user);
@@ -26,7 +26,7 @@ function Header(props) {
   const db = useSelector(state => state.database);
 
   const navigation = useNavigation();
-  const dispatch = useDispatch();  
+  const dispatch = useDispatch();
   const [trxHeaderList, setTrxHeaderList] = useState([]);
   const [trxDetailList, setTrxDetailList] = useState([]);
 
@@ -36,50 +36,54 @@ function Header(props) {
 
   function toggleDrawer() {
     navigation.toggleDrawer();
-  }  
+  }
 
   useEffect(async () => {
     if (!query.fetchQuery) {
-      if (query.send.sql == QUERY_TRX_DETAIL.UPDATE_FLAG_Y_ALL) {        
-        await dispatch(setLoading(false));                   
+      if (query.send.sql == QUERY_TRX_DETAIL.UPDATE_FLAG_Y_ALL) {
+        await dispatch(setLoading(false));
       }
-      if (query.send.sql == QUERY_TRX_HEADER.UPDATE_FLAG_Y_ALL) {        
-        await dispatch(setLoading(false));                   
+      if (query.send.sql == QUERY_TRX_HEADER.UPDATE_FLAG_Y_ALL) {
+        await dispatch(setLoading(false));
       }
     }
   }, [query]);
 
   useEffect(async () => {
     if (trxHeaderList.length != 0) {
-      await apiRequestAxios(
-        user.store.api_url + '/transactionHeader/batch',
-        'POST',
-        {data: trxHeaderList},
-      ).then(res => {              
-        
-      });
-      await dispatch(
-        queryFetch({
-          sql: QUERY_TRX_HEADER.UPDATE_FLAG_Y_ALL,
-        }),
-      );      
+      dispatch(setLoading(true));
+      apiRequestAxios(user.store.api_url + '/transactionHeader/batch', 'POST', {
+        data: trxHeaderList,
+      })
+        .then(res => {
+          dispatch(
+            queryFetch({
+              sql: QUERY_TRX_HEADER.UPDATE_FLAG_Y_ALL,
+            }),
+          );
+        })
+        .catch(err => {
+          dispatch(setLoading(false));
+        });
     }
   }, [trxHeaderList]);
 
   useEffect(async () => {
     if (trxDetailList.length != 0) {
-      await apiRequestAxios(
-        user.store.api_url + '/transactionDetail/batch',
-        'POST',
-        {data: trxDetailList},
-      ).then(res => {              
-        
-      });
-      await dispatch(
-        queryFetch({
-          sql: QUERY_TRX_DETAIL.UPDATE_FLAG_Y_ALL,
-        }),
-      );      
+      dispatch(setLoading(true));
+      apiRequestAxios(user.store.api_url + '/transactionDetail/batch', 'POST', {
+        data: trxDetailList,
+      })
+        .then(res => {
+          dispatch(
+            queryFetch({
+              sql: QUERY_TRX_DETAIL.UPDATE_FLAG_Y_ALL,
+            }),
+          );
+        })
+        .catch(err => {
+          dispatch(setLoading(false));
+        });
     }
   }, [trxDetailList]);
 
@@ -93,38 +97,45 @@ function Header(props) {
         text: 'YES',
         style: 'default',
         onPress: async () => {
-          await dispatch(setLoading(true));
-          await getTrxHeaderList()
-          await getTrxDetailList()
+          getTrxHeaderList();
+          getTrxDetailList();
         },
       },
     ]);
   }
 
-  async function getTrxHeaderList(){  
-    let result = await runSqlQuery(db.database, QUERY_TRX_HEADER.SELECT_ALL)  
+  async function getTrxHeaderList() {
+    let result = await runSqlQuery(
+      db.database,
+      QUERY_TRX_HEADER.SELECT_ALL_FLAG_NOT_Y,
+    );
     let rows = result.rows;
     if (rows.length > 0) {
       let resultList = [];
       for (let i = 0; i < rows.length; i++) {
-        if(rows.item(i).flag == 'Y') continue
-        await resultList.push(rows.item(i));
-      }               
-      setTrxHeaderList(resultList);          
-    }    
+        // if (rows.item(i).flag == 'Y') continue;
+        resultList.push(rows.item(i));
+      }
+      console.log('Header List: ');
+      console.log(resultList);
+      setTrxHeaderList(resultList);
+    }
   }
 
-  async function getTrxDetailList(){  
-    let result = await runSqlQuery(db.database, QUERY_TRX_DETAIL.SELECT_ALL)  
+  async function getTrxDetailList() {
+    let result = await runSqlQuery(
+      db.database,
+      QUERY_TRX_DETAIL.SELECT_ALL_FLAG_NOT_Y,
+    );
     let rows = result.rows;
     if (rows.length > 0) {
       let resultList = [];
       for (let i = 0; i < rows.length; i++) {
-        if(rows.item(i).flag == 'Y') continue
-        await resultList.push(rows.item(i));
-      }               
-      setTrxDetailList(resultList);          
-    }    
+        // if (rows.item(i).flag == 'Y') continue;
+        resultList.push(rows.item(i));
+      }
+      setTrxDetailList(resultList);
+    }
   }
 
   return (

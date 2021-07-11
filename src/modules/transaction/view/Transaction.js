@@ -9,7 +9,7 @@ import {
   TextInput,
   BackHandler,
   ScrollView,
-  TouchableOpacity
+  TouchableOpacity,
 } from 'react-native';
 import {queryFetch} from '../../database/DBAction';
 import {
@@ -22,10 +22,7 @@ import Container from '../../../components/Container';
 import Header from '../../../components/Header';
 import _font from '../../../styles/Typrograhpy';
 import _style from '../../../styles/';
-import {
-  useFocusEffect,
-  useNavigation,
-} from '@react-navigation/native';
+import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import {useDispatch, useSelector} from 'react-redux';
 import Button from '../../../components/Button';
 import ErrorText from '../../../components/ErrorText';
@@ -37,15 +34,27 @@ import {
   setHistoryCartListHeader,
 } from '../TransactionAction';
 import AntDesignIcon from 'react-native-vector-icons/AntDesign';
-import {dateTimeToFormat, stringToCurrency, currencyToInteger, printInvoice} from '../../../util';
+import {
+  dateTimeToFormat,
+  stringToCurrency,
+  currencyToInteger,
+  printInvoice,
+} from '../../../util';
 import Modal from 'react-native-modal';
 import {TextInputMask} from 'react-native-masked-text';
-import { setLoading } from '../../master/MasterAction';
+import {setLoading} from '../../master/MasterAction';
+import {
+  apiDeleteTrxDetailByTrxHeaderId,
+  apiGetCategoryList,
+  apiInsertTrxHeader,
+  apiUpdateTrxHeader,
+  apiUpdateTrxHeaderStatus,
+} from '../../../config/Api';
 
 const discountScheme = Yup.object().shape({
   discount: Yup.string()
-    .matches(/^[0-9]+$/, 'Only number')  
-    .transform(value => value.replace(/[^\d]/g, ''))  
+    .matches(/^[0-9]+$/, 'Only number')
+    .transform(value => value.replace(/[^\d]/g, '')),
 });
 
 const formList = [
@@ -56,38 +65,39 @@ const formList = [
 ];
 
 function Transaction() {
-  const user = useSelector(state => state.user)
+  const master = useSelector(state => state.master);
+  const user = useSelector(state => state.user);
   const query = useSelector(state => state.query);
   const transaction = useSelector(state => state.transaction);
   const db = useSelector(state => state.database);
   const dispatch = useDispatch();
-  const navigation = useNavigation();  
+  const navigation = useNavigation();
   const [categoryList, setCategoryList] = useState([]);
-  const [category, setCategory] = useState({code: '', name: ''});
+  const [category, setCategory] = useState({code: '', name: '', items: []});
   const [dataTableFocusCategory, setDataTableFocusCategory] = useState(0);
   const [itemsList, setItemsList] = useState([]);
   const [items, setItems] = useState({});
   const [dataTableFocusItems, setDataTableFocusItems] = useState();
   const [cartUpdateIndex, setCartUpdateIndex] = useState(false);
-  const [cartList, setCartList] = useState([]);  
+  const [cartList, setCartList] = useState([]);
   const [grandTotalDiscount, setGrandTotalDiscount] = useState(0);
   const [grandTotalPrice, setGrandTotalPrice] = useState(0);
   const [grandTotal, setGrandTotal] = useState(0);
-  const [itemsListBackup, setItemListBackup] = useState([]);  
+  const [itemsListBackup, setItemListBackup] = useState([]);
   const [cartListIndex, setCartListIndex] = useState(null);
   const [discountModal, setDiscountModal] = useState(false);
-  const [discountValue, setDiscountValue] = useState(0)
-  const [percentageValue, setPercentageValue] = useState("")
+  const [discountValue, setDiscountValue] = useState(0);
+  const [percentageValue, setPercentageValue] = useState('');
 
   const formik = useFormik({
     initialValues: {
-      discount: "",
+      discount: '',
     },
     validationSchema: discountScheme,
-    onSubmit: async values => {           
-      let discount = currencyToInteger(values.discount)       
-      if (discount == 0) addDiscount(0)
-      else addDiscount(discount)      
+    onSubmit: async values => {
+      let discount = currencyToInteger(values.discount);
+      if (discount == 0) addDiscount(0);
+      else addDiscount(discount);
     },
   });
 
@@ -120,21 +130,28 @@ function Transaction() {
     },
   ];
 
-  //api call only run once
   useEffect(async () => {
-    await apiGetCategoryList();    
-    // for query all item
-    // await apiGetItemsListAll();    
-  }, []);
+    // let param = [];
+    // param.push(category.code);
+    // apiGetItemsList(param);
+    // console.log(category)
+    if (
+      category != null &&
+      category.items != null &&
+      category.items.length > 0
+    ) {
+      setItems(category.items[0]);
+      setItemsList(category.items);
+      setItemListBackup(category.items);
+    } else {
+      setItems(null);
+      setItemsList([]);
+      setItemListBackup([]);
+    }
+  }, [category]);
 
   useEffect(async () => {
-    let param = [];
-    param.push(category.code);
-    await apiGetItemsList(param);
-  }, [category.code]);
-
-  useEffect(async () => {    
-    if (transaction.historyCartList != null) {      
+    if (transaction.historyCartList != null) {
       let tmp = transaction.historyCartList;
       let newArray = [];
 
@@ -153,18 +170,21 @@ function Transaction() {
       setCartList(newArray);
       calculate(newArray, transaction.historyCartListHeader.discount);
       setCartUpdateIndex(!cartUpdateIndex);
-    }  
-    
-    if (transaction.historyCartListHeader != null) {  
-      setDiscountValue(transaction.historyCartListHeader.discount)            
-      formik.setFieldValue("discount", transaction.historyCartListHeader.discount.toString())
     }
 
+    if (transaction.historyCartListHeader != null) {
+      setDiscountValue(transaction.historyCartListHeader.discount);
+      formik.setFieldValue(
+        'discount',
+        transaction.historyCartListHeader.discount.toString(),
+      );
+    }
   }, [transaction.historyCartList, transaction.historyCartListHeader]);
 
   useFocusEffect(
     useCallback(() => {
-      const unsubscribe = apiGetCategoryList();      
+      apiGetCategoryList(dispatch);
+      const unsubscribe = getCategoryItemFromStoreMaster();
       const onBackPress = e => {
         if (transaction.historyCartListHeader != null) {
           dispatch(setHistoryCartList(null));
@@ -176,7 +196,6 @@ function Transaction() {
       };
 
       BackHandler.addEventListener('hardwareBackPress', onBackPress);
-
       return () => {
         BackHandler.removeEventListener('hardwareBackPress', onBackPress);
         unsubscribe;
@@ -184,10 +203,12 @@ function Transaction() {
     }, [transaction.historyCartListHeader]),
   );
 
-  //get updated data
-  useEffect(async () => {    
-    
-    if (!query.fetchQuery) {      
+  useEffect(() => {
+    if (master.res != null) getCategoryItemFromStoreMaster();
+  }, [master.res]);
+
+  useEffect(async () => {
+    if (!query.fetchQuery) {
       if (query.send.sql == QUERY_CATEGORY.SELECT) {
         let rows = query.res.rows;
         if (rows.length > 0) {
@@ -196,7 +217,6 @@ function Transaction() {
             resultList.push(rows.item(i));
           }
           if (category.code == '') {
-            //for bug after switching to transaction and master item
             setCategory(resultList[0]);
             setCategoryList(resultList);
           }
@@ -225,21 +245,18 @@ function Transaction() {
           setItemListBackup([]);
         }
       }
-
-      if (query.send.sql == QUERY_ITEM.SELECT) {
-        let rows = query.res.rows;
-        if (rows.length > 0) {
-          let resultList = [];
-          for (let i = 0; i < rows.length; i++) {
-            resultList.push(rows.item(i));
-          }
-          setItemListBackup(resultList);
-        } else {
-          setItemListBackup([]);
-        }
-      }
     }
   }, [query]);
+
+  function getCategoryItemFromStoreMaster() {
+    let res = master.res;
+
+    if (res != null && res.length > 0) {
+      setCategory(res[0]);
+      setDataTableFocusCategory(0);
+      setCategoryList(res);
+    }
+  }
 
   function addToCart(item) {
     let tmp = cartList;
@@ -265,7 +282,7 @@ function Transaction() {
         ...item,
         qty: 1,
         total: item.price - item.discount,
-      };      
+      };
       tmp.push(newObj);
     }
 
@@ -279,14 +296,16 @@ function Transaction() {
   function calculate(data = null, discount = null) {
     let tmpTotalDiscount = 0;
     let tmpGrandTotal = 0;
-    let tmpTotalPrice = 0
+    let tmpTotalPrice = 0;
     let tmp = data != null ? data : cartList;
     for (let i = 0; i < tmp.length; i++) {
       tmpTotalDiscount +=
         (tmp[i].discountNew != undefined
           ? tmp[i].discountNew
           : tmp[i].discount) * tmp[i].qty;
-      tmpTotalPrice += tmp[i].qty * (tmp[i].priceNew != undefined ? tmp[i].priceNew : tmp[i].price)
+      tmpTotalPrice +=
+        tmp[i].qty *
+        (tmp[i].priceNew != undefined ? tmp[i].priceNew : tmp[i].price);
       tmp[i].total =
         tmp[i].qty *
         ((tmp[i].priceNew != undefined ? tmp[i].priceNew : tmp[i].price) -
@@ -294,31 +313,14 @@ function Transaction() {
             ? tmp[i].discountNew
             : tmp[i].discount));
       tmpGrandTotal += tmp[i].total;
-    }    
+    }
 
-    setGrandTotalPrice(tmpTotalPrice);        
-    setGrandTotalDiscount(tmpTotalDiscount);        
+    setGrandTotalPrice(tmpTotalPrice);
+    setGrandTotalDiscount(tmpTotalDiscount);
     setGrandTotal(tmpGrandTotal - discountValue);
-    if(discount != null){
+    if (discount != null) {
       setGrandTotal(tmpGrandTotal - discount);
-    }    
-  }
-
-  function apiGetCategoryList() {
-    dispatch(
-      queryFetch({
-        sql: QUERY_CATEGORY.SELECT,
-      }),
-    );
-  }
-
-  function apiGetItemsList(param) {
-    dispatch(
-      queryFetch({
-        sql: QUERY_ITEM.SELECT_BY_CATEGORY_CODE,
-        param,
-      }),
-    );
+    }
   }
 
   function dataRenderCategory({item, index}) {
@@ -370,16 +372,16 @@ function Transaction() {
         underlayColor="#eee">
         <>
           {headerTableItems.map((v, i) => (
-            <View
-              key={i}
-              style={_style.flexRowCenter}>
+            <View key={i} style={_style.flexRowCenter}>
               <View style={_style.flex1}>
                 <Text style={[_style.rowTableText, _font.listItemHeaderText]}>
                   {item[v.key]}
                 </Text>
               </View>
               <View style={{alignItems: 'flex-end'}}>
-                <Text style={_style.rowTableText}>{stringToCurrency(item.price)}</Text>
+                <Text style={_style.rowTableText}>
+                  {stringToCurrency(item.price)}
+                </Text>
                 <Text style={_style.rowTableText}>
                   {stringToCurrency(item.discount)}
                 </Text>
@@ -426,9 +428,7 @@ function Transaction() {
         underlayColor="#eee">
         <>
           {headerTableCartList.map((v, i) => (
-            <View
-              key={i}
-              style={_style.flexRowCenter}>
+            <View key={i} style={_style.flexRowCenter}>
               {v.key == 'name' ? (
                 <View style={_style.flex1}>
                   <Text style={[_style.rowTableText, _font.listItemHeaderText]}>
@@ -443,7 +443,9 @@ function Transaction() {
                       ? stringToCurrency(item.priceNew)
                       : stringToCurrency(item.price)}
                   </Text>
-                  <Text style={_style.rowTableText}>{stringToCurrency(item.qty)}</Text>
+                  <Text style={_style.rowTableText}>
+                    {stringToCurrency(item.qty)}
+                  </Text>
                 </View>
               ) : null}
               {v.key == 'total' ? (
@@ -483,13 +485,13 @@ function Transaction() {
   }
 
   function clearCartList() {
-    setCartList([]);    
+    setCartList([]);
     setDiscountValue(0);
     setGrandTotal(0);
-    formik.resetForm()
+    formik.resetForm();
   }
 
-  function searchText(text) {    
+  function searchText(text) {
     let newArray = [];
     for (let i = 0; i < itemsListBackup.length; i++) {
       let tmp = itemsListBackup[i].name.toLowerCase();
@@ -499,28 +501,6 @@ function Transaction() {
       }
     }
     setItemsList(newArray);
-  }
-
-  function apiUpdateToTrxHeader(param) {
-    {
-      dispatch(
-        queryFetch({
-          sql: QUERY_TRX_HEADER.UPDATE,
-          param,
-        }),
-      );
-    }
-  }
-
-  function apiUpdateToTrxDetail(param) {
-    {
-      dispatch(
-        queryFetch({
-          sql: QUERY_TRX_DETAIL.UPDATE,
-          param,
-        }),
-      );
-    }
   }
 
   function apiDeleteToTrxDetailBy(param) {
@@ -562,48 +542,50 @@ function Transaction() {
   async function transactionInsert(status) {
     let today = new Date();
     let currentDateTimeFormatted = dateTimeToFormat(today);
+    let tmpCartList = cartList;
 
-    if (transaction.historyCartListHeader != null) {      
+    if (transaction.historyCartListHeader != null) {
       let paramHeader = [];
       paramHeader.push(currentDateTimeFormatted);
       paramHeader.push(discountValue);
       paramHeader.push(grandTotal);
       paramHeader.push(status);
-      paramHeader.push(transaction.historyCartListHeader.flag == 'Y' ? 'E' : 'N');
+      paramHeader.push(
+        transaction.historyCartListHeader.flag == 'Y' ? 'E' : 'N',
+      );
       paramHeader.push(transaction.historyCartListHeader.id);
 
-      await apiUpdateToTrxHeader(paramHeader);
-      await apiDeleteToTrxDetailBy([transaction.historyCartListHeader.id]);
+      await apiUpdateTrxHeader(dispatch, paramHeader);
+      await apiDeleteTrxDetailByTrxHeaderId(dispatch, [
+        transaction.historyCartListHeader.id,
+      ]);
 
-      for (let i = 0; i < cartList.length; i++) {
-        let paramDetail = [];
-        let x = cartList[i]
-        paramDetail.push(transaction.historyCartListHeader.id);
-        paramDetail.push(x.code);
-        paramDetail.push(x.name);
-        paramDetail.push(
-          x.priceNew != undefined
-            ? x.priceNew
-            : x.price,
-        );
-        paramDetail.push(
-          x.discountNew != undefined
-            ? x.discountNew
-            : x.discount,
-        );
-        paramDetail.push(x.qty);
-        paramDetail.push(x.total);
-        paramDetail.push(currentDateTimeFormatted);
-        paramDetail.push(user.store.id);
-        paramDetail.push(user.store.name);
-        paramDetail.push('N');
-        await apiInsertToTrxDetail(paramDetail);
-      }      
+      let listSql = [];
+      for (let i = 0; i < tmpCartList.length; i++) {
+        let x = tmpCartList[i];
+        let sql = `INSERT INTO trx_detail (trx_header_id, item_code, item_name, price, discount, quantity, total, created_date, store_id, store_name, flag) VALUES (${
+          transaction.historyCartListHeader.id
+        }, '${x.code}', '${x.name}', ${
+          x.priceNew != undefined ? x.priceNew : x.price
+        }, ${x.discountNew != undefined ? x.discountNew : x.discount}, ${
+          x.qty
+        }, ${x.total}, '${currentDateTimeFormatted}', '${user.store.id}', '${
+          user.store.name
+        }', 'N')`;
+        await listSql.push(sql);
+      }
+
+      dispatch(
+        queryFetch({
+          sql: 'INSERT_BATCH',
+          param: listSql,
+        }),
+      );
 
       dispatch(setHistoryCartList(null));
       dispatch(setHistoryCartListHeader(null));
       navigation.goBack();
-    } else {      
+    } else {
       let paramHeader = [];
       paramHeader.push(currentDateTimeFormatted);
       paramHeader.push(discountValue);
@@ -613,83 +595,67 @@ function Transaction() {
       paramHeader.push(user.store.id);
       paramHeader.push(user.store.name);
       paramHeader.push('N');
-      await apiInsertToTrxHeader(paramHeader);      
+      await apiInsertTrxHeader(paramHeader);
 
       let lastId = await apiGetLastIdTrxHeader();
       lastId = lastId.rows.item(0).id;
 
-      for (let i = 0; i < cartList.length; i++) {
-        let paramDetail = [];
-        paramDetail.push(lastId);
-        paramDetail.push(cartList[i].code);
-        paramDetail.push(cartList[i].name);
-        paramDetail.push(
-          cartList[i].priceNew != undefined
-            ? cartList[i].priceNew
-            : cartList[i].price,
-        );
-        paramDetail.push(
-          cartList[i].discountNew != undefined
-            ? cartList[i].discountNew
-            : cartList[i].discount,
-        );
-        paramDetail.push(cartList[i].qty);
-        paramDetail.push(cartList[i].total);
-        paramDetail.push(currentDateTimeFormatted);  
-        paramDetail.push(user.store.id);
-        paramDetail.push(user.store.name);
-        paramDetail.push('N');            
-        // await apiInsertToTrxDetail(paramDetail);        
-        apiInsertToTrxDetail(paramDetail);        
+      let listSql = [];
+
+      for (let i = 0; i < tmpCartList.length; i++) {
+        let sql = `INSERT INTO trx_detail (trx_header_id, item_code, item_name, price, discount, quantity, total, created_date, store_id, store_name, flag) VALUES (${lastId}, '${
+          tmpCartList[i].code
+        }', '${tmpCartList[i].name}', ${
+          tmpCartList[i].priceNew != undefined
+            ? tmpCartList[i].priceNew
+            : tmpCartList[i].price
+        }, ${
+          tmpCartList[i].discountNew != undefined
+            ? tmpCartList[i].discountNew
+            : tmpCartList[i].discount
+        }, ${tmpCartList[i].qty}, ${
+          tmpCartList[i].total
+        }, '${currentDateTimeFormatted}', '${user.store.id}', '${
+          user.store.name
+        }', 'N')`;
+        await listSql.push(sql);
       }
+      dispatch(
+        queryFetch({
+          sql: 'INSERT_BATCH',
+          param: listSql,
+        }),
+      );
     }
 
-    if(status == 'BAYAR') {
-      await print(currentDateTimeFormatted)
+    if (status == 'BAYAR') {
+      await print(currentDateTimeFormatted);
     }
 
     clearCartList();
   }
 
-  async function print(date){    
-    dispatch(setLoading(true))
+  async function print(date) {
+    dispatch(setLoading(true));
     let data = {
       storeName: user.store.name,
       date,
       discount: discountValue,
       grandTotal: grandTotal,
-      discountItem : grandTotalDiscount,
+      discountItem: grandTotalDiscount,
       priceItem: grandTotalPrice,
-    }    
+    };
     try {
-      await printInvoice(data, cartList)    
-      dispatch(setLoading(false))
+      await printInvoice(data, cartList);
+      dispatch(setLoading(false));
     } catch (error) {
-      dispatch(setLoading(false))
-      Alert.alert("Error", "Printer not connected")
+      dispatch(setLoading(false));
+      Alert.alert('Error', 'Printer not connected');
     }
   }
 
   function apiGetLastIdTrxHeader() {
     return runSqlQuery(db.database, QUERY_TRX_HEADER.GET_LAST_ID);
-  }
-
-  function apiInsertToTrxHeader(param) {
-    dispatch(
-      queryFetch({
-        sql: QUERY_TRX_HEADER.INSERT,
-        param,
-      }),
-    );
-  }
-
-  function apiInsertToTrxDetail(param) {
-    dispatch(
-      queryFetch({
-        sql: QUERY_TRX_DETAIL.INSERT,
-        param,
-      }),
-    );
   }
 
   function hapusInvoice() {
@@ -708,7 +674,7 @@ function Transaction() {
             param.push('HAPUS');
             param.push('E');
             param.push(transaction.historyCartListHeader.id);
-            await apiUpdateStatus(param);
+            await apiUpdateTrxHeaderStatus(dispatch, param);
             Alert.alert('Information', 'Transaction successfully deleted!', [
               {
                 text: 'Ok',
@@ -730,36 +696,29 @@ function Transaction() {
     );
   }
 
-  function apiUpdateStatus(param) {
-    dispatch(
-      queryFetch({
-        sql: QUERY_TRX_HEADER.UPDATE_STATUS,
-        param,
-      }),
-    );
-  }
-
   function addDiscount(values) {
-    setGrandTotal(parseInt(grandTotal) + parseInt(discountValue) - parseInt(values))
-    setDiscountModal(false)
-    setDiscountValue(values)    
+    setGrandTotal(
+      parseInt(grandTotal) + parseInt(discountValue) - parseInt(values),
+    );
+    setDiscountModal(false);
+    setDiscountValue(values);
   }
 
   function cancelDiscount() {
-    setDiscountModal(false)    
+    setDiscountModal(false);
     // formik.resetForm()
   }
 
-  function calculatePercentage(text){
-    if(text.length > 0){
-      let v = parseInt(text)
-      let discount = v / 100 * (grandTotal + discountValue);
-      formik.setFieldValue("discount", discount.toString())
-    }else{
-      formik.setFieldValue("discount", "")
+  function calculatePercentage(text) {
+    if (text.length > 0) {
+      let v = parseInt(text);
+      let discount = (v / 100) * (grandTotal + discountValue);
+      formik.setFieldValue('discount', discount.toString());
+    } else {
+      formik.setFieldValue('discount', '');
     }
 
-    setPercentageValue(text)
+    setPercentageValue(text);
   }
 
   return (
@@ -825,18 +784,25 @@ function Transaction() {
             keyExtractor={(item, index) => index}
             stickyHeaderIndices={[0]}
           />
-          <View
-            style={_s.totalHeaderBorder}>
+          <View style={_s.totalHeaderBorder}>
             <View style={_style.flex1}>
               <Text style={_style.totalHeaderText}>Discount</Text>
             </View>
-            <TouchableOpacity onPress={() => setDiscountModal(true)} disabled={cartList.length == 0 ? true : false}>
-              <Text style={_style.totalHeaderText}>{discountValue == 0 ? "Add Discount" : stringToCurrency(discountValue)}</Text>
+            <TouchableOpacity
+              onPress={() => setDiscountModal(true)}
+              disabled={cartList.length == 0 ? true : false}>
+              <Text style={_style.totalHeaderText}>
+                {discountValue == 0
+                  ? 'Add Discount'
+                  : stringToCurrency(discountValue)}
+              </Text>
             </TouchableOpacity>
           </View>
           <View style={_style.totalHeaderContainer}>
             <View style={_style.flex1}>
-              <Text style={[_style.totalHeaderText, {fontSize: 20}]}>Total</Text>
+              <Text style={[_style.totalHeaderText, {fontSize: 20}]}>
+                Total
+              </Text>
             </View>
             <View>
               <Text style={[_style.totalHeaderText, {fontSize: 20}]}>
@@ -846,8 +812,7 @@ function Transaction() {
           </View>
           {cartList.length > 0 && (
             <View style={_style.rowDirection}>
-              <View
-                style={[_style.flex1, _style.tableSeparator]}>
+              <View style={[_style.flex1, _style.tableSeparator]}>
                 <Button
                   btnText="Bayar & Print"
                   onPress={() => showAlertBayarAndSimpan('BAYAR')}
@@ -870,8 +835,7 @@ function Transaction() {
         onBackdropPress={cancelDiscount}
         onBackButtonPress={cancelDiscount}>
         <View style={[_style.flex1, _style.bgWhite]}>
-          <View
-            style={[_style.rowDirectionCenter, _style.px15, _style.pt15]}>
+          <View style={[_style.rowDirectionCenter, _style.px15, _style.pt15]}>
             <TouchableOpacity onPress={cancelDiscount}>
               <AntDesignIcon
                 name="close"
@@ -893,17 +857,17 @@ function Transaction() {
                     <TextInputMask
                       style={_style.fieldText}
                       key={index}
-                      type={'money'}                    
+                      type={'money'}
                       options={{
                         precision: 0,
                         separator: '.',
                         delimiter: ',',
                         unit: '',
                         suffixUnit: '',
-                      }}                      
-                      onChangeText={(e)=>{
-                        formik.setFieldValue(item.key, e)
-                        setPercentageValue("")
+                      }}
+                      onChangeText={e => {
+                        formik.setFieldValue(item.key, e);
+                        setPercentageValue('');
                       }}
                       onBlur={formik.handleBlur(item.key)}
                       value={formik.values[item.key]}
@@ -913,7 +877,7 @@ function Transaction() {
                     ) : null}
                   </View>
                 </View>
-              ))}   
+              ))}
               <View style={_style.fieldContainer}>
                 <Text style={_style.fieldHeaderText}>Percentage</Text>
                 <View style={_style.mx10}>
@@ -921,10 +885,10 @@ function Transaction() {
                     keyboardType="number-pad"
                     style={_style.fieldText}
                     value={percentageValue}
-                    onChangeText={(text) => calculatePercentage(text)}
+                    onChangeText={text => calculatePercentage(text)}
                   />
-                </View>                
-              </View>              
+                </View>
+              </View>
             </ScrollView>
           </View>
           <View>
@@ -936,13 +900,15 @@ function Transaction() {
   );
 }
 
-const _s = StyleSheet.create({  
-  totalHeaderBorder:{
+const _s = StyleSheet.create({
+  totalHeaderBorder: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
     marginBottom: 10,
-    borderTopColor: '#eee', borderTopWidth: 3, paddingTop: 10
+    borderTopColor: '#eee',
+    borderTopWidth: 3,
+    paddingTop: 10,
   },
   totalHeaderContainer: {
     flexDirection: 'row',
@@ -957,11 +923,11 @@ const _s = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 10,
     marginVertical: 10,
-  },  
+  },
   hapusSemuaText: {
     color: '#5395B5',
     ..._style.listItemHeaderText,
-  },  
+  },
 });
 
 export default Transaction;
