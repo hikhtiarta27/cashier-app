@@ -7,7 +7,7 @@ import * as Yup from 'yup';
 import _style from '../../../styles/';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useDispatch } from 'react-redux';
-import { apiUpdateCategory } from '../../../config/Api';
+import { apiUpdateCategoryById } from '../../../config/Api';
 
 const categoryScheme = Yup.object().shape({
   code: Yup.string().required('Required'),
@@ -47,7 +47,7 @@ function MasterCategoryEdit() {
       let param = []     
       param.push(values.name) 
       param.push(values.code)
-      await apiUpdateCategory(dispatch, param)
+      await apiUpdateCategoryById(dispatch, param)
       Alert.alert("Information", "Master Category successfully updated!", 
         [
           {

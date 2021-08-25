@@ -10,12 +10,20 @@ import {
 //SQLITE
 
 //DB INIT
-
+/**
+ * Initialize SQLITE Database
+ * @param {function} dispatch 
+ */
 export const apiDatabaseInit = dispatch => {
   dispatch(dbFetch());
 };
 
 //CATEGORY
+/**
+ * API for create category table
+ * @function
+ * @param {function} dispatch 
+ */
 export const apiCreateCategory = dispatch => {
   dispatch(
     queryFetch({
@@ -24,6 +32,11 @@ export const apiCreateCategory = dispatch => {
   );
 };
 
+/**
+ * API for get all category records
+ * @function
+ * @param {function} dispatch 
+ */
 export const apiGetCategoryList = dispatch => {
   dispatch(
     queryFetch({
@@ -32,13 +45,24 @@ export const apiGetCategoryList = dispatch => {
   );
 };
 
+/**
+ * API for delete all category records
+ * @function
+ * @param {function} dispatch 
+ */
 export const apiDeleteCategory = dispatch =>{
   dispatch(queryFetch({
     sql: QUERY_CATEGORY.DELETE
   }))
 }
 
-export const apiUpdateCategory = (dispatch, param) =>{
+/**
+ * API for update category record based on category ID
+ * @function
+ * @param {function} dispatch
+ * @param {object} param 
+ */
+export const apiUpdateCategoryById = (dispatch, param) =>{
   dispatch(queryFetch({
     sql: QUERY_CATEGORY.UPDATE,
     param
@@ -46,15 +70,25 @@ export const apiUpdateCategory = (dispatch, param) =>{
 }
 
 //ITEM
-export const apiGetItemList = (dispatch, param) => {
+/**
+ * API for get all item records
+ * @function
+ * @param {function} dispatch 
+ */
+export const apiGetItemList = (dispatch) => {
   dispatch(
     queryFetch({
-      sql: QUERY_ITEM.SELECT,
-      param,
+      sql: QUERY_ITEM.SELECT     
     }),
   );
 };
 
+/**
+ * API for get all item records based on Category Record
+ * @function
+ * @param {function} dispatch
+ * @param {object} param 
+ */
 export const apiGetItemListByCategoryCode = (dispatch, param) => {
   dispatch(
     queryFetch({
@@ -64,6 +98,11 @@ export const apiGetItemListByCategoryCode = (dispatch, param) => {
   );
 };
 
+/**
+ * API for create item table
+ * @function
+ * @param {function} dispatch
+ */
 export const apiCreateItem = dispatch => {
   dispatch(
     queryFetch({
@@ -72,12 +111,23 @@ export const apiCreateItem = dispatch => {
   );
 };
 
+/**
+ * API for delete all item records
+ * @function
+ * @param {function} dispatch
+ */
 export const apiDeleteItem = dispatch =>{
   dispatch(queryFetch({
     sql: QUERY_ITEM.DELETE
   }))
 }
 
+/**
+ * API for update item based on item ID
+ * @function
+ * @param {function} dispatch 
+ * @param {object} param
+ */
 export const apiUpdateItem = (dispatch, param) =>{
   dispatch(
     queryFetch({

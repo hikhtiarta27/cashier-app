@@ -113,7 +113,7 @@ function MasterCategory() {
                 await apiDeleteCategory(dispatch);
                 let listSql = []                
                 for (let i = 1; i < dataParse.length; i++) {
-                  let sql = `INSERT INTO master_category (code, name, created_date) VALUES ('${dataParse[i][0]}', '${dataParse[i][1]}', '${today}')`
+                  let sql = `INSERT INTO master_category (code, name, created_date) VALUES ('${dataParse[i][0].trim()}', '${dataParse[i][1].trim()}', '${today}')`
                   await listSql.push(sql)                  
                 }    
                 

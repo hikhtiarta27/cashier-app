@@ -75,7 +75,7 @@ function Setting() {
             <Text style={_s.pairedHeader}>List Paired Devices</Text>
           </View>
           {pairedDevices.map((item, index)=>(
-          <TouchableHighlight key={index} style={_style.px15} onPress={()=>connectToPairedDevices(item)} underlayColor="#eee">
+          <TouchableHighlight key={index} style={_style.py15} onPress={()=>connectToPairedDevices(item)} underlayColor="#eee">
             <View style={[_style.rowDirectionCenter, _style.px20]}>
               <View style={_style.flex1}>
                 <Text style={_style.bodyText}>{item.name}</Text>

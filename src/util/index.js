@@ -139,22 +139,20 @@ export const printInvoice = async (header, detail) =>{
     fonttype: 0,
   });
   await BluetoothEscposPrinter.setBlob(0);  
-  let columnWidths = [16, 5, 11]; 
+  let columnWidths = [15, 7, 10]; 
   for(let i=0; i<detail.length; i++){
     let name = detail[i].item_name != undefined ? detail[i].item_name : detail[i].name
     name = name.toString()
     let qty = detail[i].qty != undefined ? detail[i].qty : detail[i].quantity    
     let price = detail[i].priceNew != undefined ? detail[i].priceNew : detail[i].price    
     price = stringToCurrency(price * qty)
-    qty = `x${stringToCurrency(qty)}`    
-    // let total = detail[i].total
-    // total = stringToCurrency(total)    
+    qty = `x${stringToCurrency(qty)}`        
 
     await BluetoothEscposPrinter.printColumn(
       columnWidths,
       [
         BluetoothEscposPrinter.ALIGN.LEFT,        
-        BluetoothEscposPrinter.ALIGN.CENTER,
+        BluetoothEscposPrinter.ALIGN.RIGHT,
         BluetoothEscposPrinter.ALIGN.RIGHT,
       ],
       [
@@ -163,7 +161,7 @@ export const printInvoice = async (header, detail) =>{
         price.toString(),        
       ],
       {},
-    );
+    ); 
   }
   await BluetoothEscposPrinter.printText(
     '--------------------------------\n\r',

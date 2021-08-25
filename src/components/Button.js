@@ -8,14 +8,8 @@ function Button(props) {
     <TouchableHighlight
       underlayColor="#5395B5"
       {...props}
-      style={[
-        _s.container,
-        props.type == 'primary' ? {backgroundColor: '#68BBE3'} : {paddingHorizontal: 0,},
-      ]}>
-      <Text style={[
-        _s.btnText,
-        props.type == 'primary' ? {color: 'white'} : {color: '#9FA0AB'},
-      ]}>
+      style={_s.container(props.type)}>
+      <Text style={_s.btnText(props.type)}>
         {props.btnText}</Text>
     </TouchableHighlight>
   );
@@ -23,21 +17,31 @@ function Button(props) {
 
 
 const _s = StyleSheet.create({
-  container: {
-    paddingHorizontal: 15,
+  container: type => ({
+    backgroundColor: type == 'primary' ? "#68BBE3" : null,
+    paddingHorizontal: type == 'primary' ? 15 : 0,
     paddingVertical: 10,        
-  },
-  btnText: {
+  }),
+  btnText: type => ({
     ..._style.btnText,
-    color: 'white',
+    color: type == 'primary' ? 'white' : '#9FA0AB',
     textAlign: 'center',
     textTransform: 'uppercase'
-  },
+  })
 });
 
 Button.propTypes = {
-  btnText: PropTypes.string,
+  /**
+   * Button Text
+   */
+  btnText: PropTypes.string.isRequired,
+  /**
+   * Button Type: Primary | Secondary   
+   */
   type: PropTypes.string,
+  /**
+   * Button handler
+   */
   onPress: PropTypes.func
 };
 

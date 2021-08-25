@@ -182,16 +182,12 @@ function TransactionHistory() {
   //--------------------UPLOAD
 
   //api call only run once
-  useEffect(async () => {
-    // await apiGetHistoryList();
-    console.log('Run once');
-    // await syncFunc();
+  useEffect(async () => {    
     await runApiGetByDate();
   }, []);
 
   useFocusEffect(
-    useCallback(() => {
-      console.log('On focus');
+    useCallback(() => {      
       setHistoryList([])
       setHistory({})
       setCartList([])
@@ -207,8 +203,7 @@ function TransactionHistory() {
   );
 
   useEffect(async () => {
-    if (history.id != undefined) {
-      console.log("RUNNNNNNN")
+    if (history.id != undefined) {      
       let param = [];
       param.push(
         history.ref_void_id != null ? history.ref_void_id : history.id,

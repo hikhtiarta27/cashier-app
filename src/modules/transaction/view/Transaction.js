@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {memo, useCallback, useEffect, useMemo, useState} from 'react';
 import {
   FlatList,
   View,
@@ -62,6 +62,15 @@ const formList = [
     value: 'Discount',
   },
 ];
+
+const MemoFlatList = memo((props) =>{
+  console.log(`from : ${props.from}`)
+  return (
+    <FlatList
+      {...props}
+    />
+  );
+}, (prevProps, nextProps)=>prevProps.renderItem === nextProps.renderItem)
 
 function Transaction() {
   const master = useSelector(state => state.master);
@@ -148,20 +157,20 @@ function Transaction() {
   useEffect(async () => {
     if (transaction.historyCartList != null) {
       let tmp = transaction.historyCartList;
-      let newArray = [];
-
-      for (let i = 0; i < tmp.length; i++) {
+      let newArray = tmp.reduce((x, item)=>{
         let obj = {
-          id_trx_detail: tmp[i].id,
-          code: tmp[i].item_code,
-          name: tmp[i].item_name,
-          price: parseInt(tmp[i].price),
-          qty: parseInt(tmp[i].quantity),
-          discount: parseInt(tmp[i].discount),
-          total: parseInt(tmp[i].total),
-        };
-        await newArray.push(obj);
-      }
+          id_trx_detail: item.id,
+          code: item.item_code,
+          name: item.item_name,
+          price: parseInt(item.price),
+          qty: parseInt(item.quantity),
+          discount: parseInt(item.discount),
+          total: parseInt(item.total),
+        }
+        x.push(obj)  
+        return x
+      }, []);
+      
       setCartList(newArray);
       calculate(newArray, transaction.historyCartListHeader.discount);
       setCartUpdateIndex(!cartUpdateIndex);
@@ -191,6 +200,7 @@ function Transaction() {
 
       BackHandler.addEventListener('hardwareBackPress', onBackPress);
       return () => {
+        console.log('clean-up')
         BackHandler.removeEventListener('hardwareBackPress', onBackPress);
         unsubscribe;
       };
@@ -317,7 +327,7 @@ function Transaction() {
     }
   }
 
-  function dataRenderCategory({item, index}) {
+  function dataRenderCategory({item, index}) {    
     return (
       <TouchableHighlight
         key={index}
@@ -339,7 +349,7 @@ function Transaction() {
         </>
       </TouchableHighlight>
     );
-  }
+  }  
 
   function categoryHeaderRender() {
     return (
@@ -694,6 +704,17 @@ function Transaction() {
     setPercentageValue(text);
   }
 
+  // useEffect(()=>{
+  //   console.log('render list')
+  // }, [JSON.stringify(cartList)])
+
+  const memoDataRenderCategory = useCallback(dataRenderCategory, [category])
+  const memoCategoryHeaderRender = useCallback(categoryHeaderRender, [])
+  const memoDataRenderItems = useCallback(dataRenderItems, [category, itemsList, cartList.length == 0])
+  const memoItemsHeaderRender = useCallback(itemsHeaderRender, [])
+  const memoDataRenderCartList = useCallback(dataRenderCartList, [JSON.stringify(cartList)])
+  const memoCartListHeaderRender = useCallback(cartListHeaderRender, [])
+
   return (
     <Container>
       {transaction.historyCartListHeader != null ? (
@@ -726,10 +747,11 @@ function Transaction() {
       </View>
       <View style={_style.flexRow}>
         <View style={[_style.flex1, _style.tableSeparator]}>
-          <FlatList
-            ListHeaderComponent={categoryHeaderRender}
+          <MemoFlatList
+            from={'category'}
+            ListHeaderComponent={memoCategoryHeaderRender}
             showsVerticalScrollIndicator={false}
-            renderItem={dataRenderCategory}
+            renderItem={memoDataRenderCategory}
             data={categoryList}
             extraData={categoryList}
             keyExtractor={(item, index) => index}
@@ -737,10 +759,11 @@ function Transaction() {
           />
         </View>
         <View style={[_style.flex2, _style.tableSeparator]}>
-          <FlatList
-            ListHeaderComponent={itemsHeaderRender}
+          <MemoFlatList
+            from={'items'}
+            ListHeaderComponent={memoItemsHeaderRender}
             showsVerticalScrollIndicator={false}
-            renderItem={dataRenderItems}
+            renderItem={memoDataRenderItems}
             data={itemsList}
             extraData={itemsList}
             keyExtractor={(item, index) => index}
@@ -748,10 +771,11 @@ function Transaction() {
           />
         </View>
         <View style={_style.flex2}>
-          <FlatList
-            ListHeaderComponent={cartListHeaderRender}
+          <MemoFlatList
+            from={'cart list'}
+            ListHeaderComponent={memoCartListHeaderRender}
             showsVerticalScrollIndicator={false}
-            renderItem={dataRenderCartList}
+            renderItem={memoDataRenderCartList}
             data={cartList}
             extraData={cartUpdateIndex}
             keyExtractor={(item, index) => index}

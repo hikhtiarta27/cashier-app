@@ -180,14 +180,14 @@ function SwithRouter() {
             'DEFAULT_ID',
             'DEFAULT_NAME',
             'ADMIN',
-            'https://posapp30.herokuapp.com/api',
+            'https://api.ongfood.biz.id/api',
           ]);
           dispatch(
             setStore({
               id: 'DEFAULT_ID',
               name: 'DEFAULT_NAME',
               password: 'ADMIN',
-              api_url: 'https://posapp30.herokuapp.com/api',
+              api_url: 'https://api.ongfood.biz.id/api',
             }),
           );
         } else {

@@ -156,7 +156,7 @@ function MasterItem() {
                 await apiDeleteItem(dispatch);
                 let listSql = []                
                 for (let i = 1; i < dataParse.length; i++) {
-                  let sql = `INSERT INTO master_item (code, category_code, name, price, discount, created_date) VALUES ('${dataParse[i][0]}', '${dataParse[i][1]}', '${dataParse[i][2]}', ${dataParse[i][3]}, ${dataParse[i][4]}, '${today}')`
+                  let sql = `INSERT INTO master_item (code, category_code, name, price, discount, created_date) VALUES ('${dataParse[i][0].trim()}', '${dataParse[i][1].trim()}', '${dataParse[i][2].trim()}', ${dataParse[i][3]}, ${dataParse[i][4]}, '${today}')`
                   await listSql.push(sql)                  
                 }  
                 
@@ -239,7 +239,7 @@ function MasterItem() {
     if(filterCategoryText != ""){
       let param = []
       param.push(filterCategoryText)
-      apiGetItemListByCategoryCode(dispatch)
+      apiGetItemListByCategoryCode(dispatch, param)
     }else{
       apiGetItemList(dispatch)
     }
