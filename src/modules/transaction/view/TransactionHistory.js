@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState} from 'react';
+/* eslint-disable */
+import React, {useCallback, useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -32,7 +33,15 @@ import Modal from 'react-native-modal';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {dateTimeToFormat, printInvoice, apiRequestAxios} from '../../../util';
 import {setLoading} from '../../master/MasterAction';
-import { apiGetTrxDetailByTrxHeaderId, apiGetTrxHeaderByDate, apiGetTrxHeaderByDateBetween, apiInsertTrxHeaderVoid, apiUpdateTrxDetailFlagToY, apiUpdateTrxHeaderFlagToY, apiUpdateTrxHeaderStatus } from '../../../config/Api';
+import {
+  apiGetTrxDetailByTrxHeaderId,
+  apiGetTrxHeaderByDate,
+  apiGetTrxHeaderByDateBetween,
+  apiInsertTrxHeaderVoid,
+  apiUpdateTrxDetailFlagToY,
+  apiUpdateTrxHeaderFlagToY,
+  apiUpdateTrxHeaderStatus,
+} from '../../../config/Api';
 
 function TransactionHistory() {
   const user = useSelector(state => state.user);
@@ -50,6 +59,9 @@ function TransactionHistory() {
   const [filterStatusFocus, setFilterStatusFocus] = useState(0);
   const [filterStatusFocusPrev, setFilterStatusFocusPrev] =
     useState(filterStatusFocus);
+  const [filterOjolFocus, setFilterOjolFocus] = useState(0);
+  const [filterOjolFocusPrev, setFilterOjolFocusPrev] =
+    useState(filterOjolFocus);
   const [filterVisible, setFilterVisible] = useState(false);
 
   const [dateFilter, setDateFilter] = useState(new Date());
@@ -64,6 +76,7 @@ function TransactionHistory() {
 
   const filterItem = ['Hari ini', 'Kemarin', '1 Minggu Terakhir'];
   const filterStatus = ['Semua', 'Simpan', 'Hapus', 'Bayar', 'Void'];
+  const filterOjol = ['Semua', 'Ya', 'Tidak'];
 
   const headerTable = [
     {
@@ -94,6 +107,10 @@ function TransactionHistory() {
       key: 'ref_void_id',
       value: 'Ref',
     },
+    {
+      key: 'ojol',
+      value: 'Ojol',
+    },
   ];
 
   const headerTableCartList = [
@@ -115,33 +132,25 @@ function TransactionHistory() {
 
   useEffect(async () => {
     if (trxHeaderList.length != 0) {
-      apiRequestAxios(
-        user.store.api_url + '/transactionHeader/batch',
-        'POST',
-        {data: trxHeaderList},
-      )
+      apiRequestAxios(user.store.api_url + '/transactionHeader/batch', 'POST', {
+        data: trxHeaderList,
+      })
         .then(res => {
-          apiUpdateTrxHeaderFlagToY(dispatch)
+          apiUpdateTrxHeaderFlagToY(dispatch);
         })
-        .catch(err => {
-          
-        });      
+        .catch(err => {});
     }
   }, [trxHeaderList]);
 
   useEffect(async () => {
     if (trxDetailList.length != 0) {
-      apiRequestAxios(
-        user.store.api_url + '/transactionDetail/batch',
-        'POST',
-        {data: trxDetailList},
-      )
-      .then(res =>{
-        apiUpdateTrxDetailFlagToY(dispatch)      
+      apiRequestAxios(user.store.api_url + '/transactionDetail/batch', 'POST', {
+        data: trxDetailList,
       })
-      .catch(err => {
-        
-      });      
+        .then(res => {
+          apiUpdateTrxDetailFlagToY(dispatch);
+        })
+        .catch(err => {});
     }
   }, [trxDetailList]);
 
@@ -152,7 +161,10 @@ function TransactionHistory() {
   }
 
   async function getTrxHeaderList() {
-    let result = await runSqlQuery(db.database, QUERY_TRX_HEADER.SELECT_ALL_FLAG_NOT_Y);
+    let result = await runSqlQuery(
+      db.database,
+      QUERY_TRX_HEADER.SELECT_ALL_FLAG_NOT_Y,
+    );
     let rows = result.rows;
     if (rows.length > 0) {
       let resultList = [];
@@ -160,14 +172,15 @@ function TransactionHistory() {
         // if (rows.item(i).flag == 'Y') continue;
         resultList.push(rows.item(i));
       }
-      console.log('Header List: ');
-      console.log(resultList);
       setTrxHeaderList(resultList);
     }
   }
 
   async function getTrxDetailList() {
-    let result = await runSqlQuery(db.database, QUERY_TRX_DETAIL.SELECT_ALL_FLAG_NOT_Y);
+    let result = await runSqlQuery(
+      db.database,
+      QUERY_TRX_DETAIL.SELECT_ALL_FLAG_NOT_Y,
+    );
     let rows = result.rows;
     if (rows.length > 0) {
       let resultList = [];
@@ -175,6 +188,7 @@ function TransactionHistory() {
         // if (rows.item(i).flag == 'Y') continue;
         resultList.push(rows.item(i));
       }
+      console.log(resultList);
       setTrxDetailList(resultList);
     }
   }
@@ -182,20 +196,22 @@ function TransactionHistory() {
   //--------------------UPLOAD
 
   //api call only run once
-  useEffect(async () => {    
+  useEffect(async () => {
     await runApiGetByDate();
   }, []);
 
   useFocusEffect(
-    useCallback(() => {      
-      setHistoryList([])
-      setHistory({})
-      setCartList([])
+    useCallback(() => {
+      setHistoryList([]);
+      setHistory({});
+      setCartList([]);
       const unsubscribe = syncFunc();
       const unsubscribe1 = runApiGetByDate();
       setFilterItemFocus(0);
       setFilterStatusFocus(0);
       setFilterStatusFocusPrev(0);
+      setFilterOjolFocus(0);
+      setFilterOjolFocusPrev(0);
       return () => {
         unsubscribe, unsubscribe1;
       };
@@ -203,7 +219,7 @@ function TransactionHistory() {
   );
 
   useEffect(async () => {
-    if (history.id != undefined) {      
+    if (history.id != undefined) {
       let param = [];
       param.push(
         history.ref_void_id != null ? history.ref_void_id : history.id,
@@ -215,7 +231,12 @@ function TransactionHistory() {
   useEffect(async () => {
     await runApiGetByDate();
     setFilterItemModalFocus(filterItemFocus);
-  }, [filterItemFocus, filterStatusFocusPrev, dateFilterPrev]);
+  }, [
+    filterItemFocus,
+    filterStatusFocusPrev,
+    dateFilterPrev,
+    filterOjolFocusPrev,
+  ]);
 
   async function runApiGetByDate() {
     let today = new Date();
@@ -239,6 +260,9 @@ function TransactionHistory() {
         ? `%${filterStatus[filterStatusFocus].toUpperCase()}%`
         : '%%',
     );
+    param.push(
+      filterOjolFocus != 0 ? `%${filterOjolFocus == 1 ? 1 : 0}%` : '%%',
+    );
     if (filterItem[filterItemFocus] == '1 Minggu Terakhir') {
       let param = [];
       let tomorrow = new Date();
@@ -250,17 +274,37 @@ function TransactionHistory() {
           ? `%${filterStatus[filterStatusFocus].toUpperCase()}%`
           : '%%',
       );
+      param.push(
+        filterOjolFocus != 0 ? `%${filterOjolFocus == 1 ? 1 : 0}%` : '%%',
+      );
       await apiGetTrxHeaderByDateBetween(dispatch, param);
     } else {
       await apiGetTrxHeaderByDate(dispatch, param);
     }
 
-    if (filterStatusFocus != 0) setCounterFilter(1);
-
-    if (filterItemFocus != 0) setCounterFilter(1);
-
-    if (filterItemFocus == 0 && filterStatusFocus == 0) setCounterFilter(0);
-    if (filterItemFocus != 0 && filterStatusFocus != 0) setCounterFilter(2);
+    if (filterItemFocus == 0 && filterStatusFocus == 0 && filterOjolFocus == 0)
+      setCounterFilter(0);
+    if (
+      filterItemFocus != 0 &&
+      filterStatusFocus != 0 &&
+      filterOjolFocus != 0
+    ) {
+      setCounterFilter(3);
+    } else {
+      let tmp = 0;
+      if (filterStatusFocus != 0) {
+        setCounterFilter(tmp + 1);
+        tmp++;
+      }
+      if (filterItemFocus != 0) {
+        setCounterFilter(tmp + 1);
+        tmp++;
+      }
+      if (filterOjolFocus != 0) {
+        setCounterFilter(tmp + 1);
+        tmp++;
+      }
+    }
   }
 
   function apiGetTotalItemByRefVoidId(param) {
@@ -290,6 +334,7 @@ function TransactionHistory() {
             }
             resultList.push(rows.item(i));
           }
+          console.log(resultList);
           setHistory(resultList[0]);
           setRefreshCartList(!refreshCartList);
           setHistoryList(resultList);
@@ -299,7 +344,7 @@ function TransactionHistory() {
           setHistory({});
           setHistoryList([]);
         }
-        dispatch(setLoading(false))
+        dispatch(setLoading(false));
       }
 
       if (query.send.sql == QUERY_TRX_DETAIL.SELECT_BY_TRX_HEADER_ID) {
@@ -396,6 +441,7 @@ function TransactionHistory() {
             paramHeader.push(user.store.id);
             paramHeader.push(user.store.name);
             paramHeader.push('N');
+            paramHeader.push(history.ojol);
             await apiInsertTrxHeaderVoid(dispatch, paramHeader);
             await runApiGetByDate();
             Alert.alert('Information', 'Transaction successfully voided!', [
@@ -435,6 +481,10 @@ function TransactionHistory() {
                 v.key == 'grand_total' ||
                 v.key == 'total_item'
                   ? stringToCurrency(item[v.key])
+                  : v.key == 'ojol'
+                  ? item[v.key] == 1
+                    ? 'Ya'
+                    : 'Tidak'
                   : item[v.key]}
               </Text>
             </View>
@@ -454,9 +504,9 @@ function TransactionHistory() {
         ))}
       </View>
     );
-  }    
+  }
 
-  function dataRenderCartList({item, index}) {    
+  function dataRenderCartList({item, index}) {
     return (
       <View key={index} style={[_style.rowTable]}>
         <>
@@ -533,15 +583,22 @@ function TransactionHistory() {
   async function handleFilter() {
     await setFilterItemFocus(filterItemModalFocus);
     await setFilterStatusFocusPrev(filterStatusFocus);
+    await setFilterOjolFocusPrev(filterOjolFocus);
     await setFilterVisible(!filterVisible);
     await setDateFilterPrev(dateFilter);
 
-    if (filterItemModalFocus != 0 && filterStatusFocus != 0) {
-      setCounterFilter(2);
-    } else if (filterItemModalFocus == 0 && filterStatusFocus == 0) {
+    if (
+      filterItemModalFocus != 0 &&
+      filterStatusFocus != 0 &&
+      filterOjolFocus != 0
+    ) {
+      setCounterFilter(3);
+    } else if (
+      filterItemModalFocus == 0 &&
+      filterStatusFocus == 0 &&
+      filterOjolFocus == 0
+    ) {
       setCounterFilter(0);
-    } else if (filterItemModalFocus != 0 || filterStatusFocus != 0) {
-      setCounterFilter(1);
     }
   }
 
@@ -549,6 +606,7 @@ function TransactionHistory() {
     setIsDateFilter(false);
     setFilterItemModalFocus(filterItemFocus);
     setFilterStatusFocus(filterStatusFocusPrev);
+    setFilterOjolFocus(filterOjolFocusPrev);
     setFilterVisible(!filterVisible);
   }
 
@@ -590,9 +648,9 @@ function TransactionHistory() {
     }
   }
 
-  function handleRefresh(){
-    dispatch(setLoading(true))
-    runApiGetByDate()
+  function handleRefresh() {
+    dispatch(setLoading(true));
+    runApiGetByDate();
   }
 
   return (
@@ -632,6 +690,7 @@ function TransactionHistory() {
                   setFilterItemModalFocus(0);
                   // setFilterStatusFocusPrev(filterStatusFocus)
                   setFilterStatusFocus(0);
+                  setFilterOjolFocus(0);
                 }}>
                 <Text style={[_style.modalHeader, {color: '#68BBE3'}]}>
                   Reset
@@ -692,10 +751,30 @@ function TransactionHistory() {
                 </TouchableOpacity>
               ))}
             </View>
+            <Text style={_style.filterHeader}>Ojol</Text>
+            <View style={[_style.rowDirection, _style.mt10]}>
+              {filterOjol.map((item, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    _style.filterBtn,
+                    filterOjolFocus == index
+                      ? {borderColor: '#274472', borderWidth: 1}
+                      : null,
+                  ]}
+                  activeOpacity={1}
+                  onPress={() => setFilterOjolFocus(index)}>
+                  <View style={_style.rowDirectionCenter}>
+                    <Text style={_style.filterText}>{item}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
           <View>
             {(filterItemModalFocus != filterItemFocus ||
               filterStatusFocus != filterStatusFocusPrev ||
+              filterOjolFocus != filterOjolFocusPrev ||
               dateFilter != dateFilterPrev) && (
               <Button btnText="Simpan" onPress={() => handleFilter()} />
             )}
@@ -754,7 +833,7 @@ function TransactionHistory() {
           {/* HISTORY LIST */}
           <FlatList
             refreshControl={
-              <RefreshControl 
+              <RefreshControl
                 refreshing={user.loading}
                 onRefresh={handleRefresh}
               />
@@ -773,7 +852,7 @@ function TransactionHistory() {
           {history != null ? (
             <>
               <View style={_style.flex1}>
-                <FlatList                  
+                <FlatList
                   ListHeaderComponent={cartListHeaderRender}
                   showsVerticalScrollIndicator={false}
                   renderItem={dataRenderCartList}

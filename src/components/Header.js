@@ -1,3 +1,4 @@
+/* eslint-disable */
 import React, {memo, useCallback, useEffect, useMemo, useState} from 'react';
 import {
   View,
@@ -141,7 +142,7 @@ function Header(props) {
       ) : null}
       {props.drawerBtn ? (
         <TouchableOpacity style={_s.btnContainer} onPress={toggleDrawer}>
-          <OctoIcon name="three-bars" size={20} color={'#000'} />
+          <OctoIcon name="three-bars" size={26} color={'#000'} />
         </TouchableOpacity>
       ) : null}
       <Text style={[_style.h6, _style.flex1]}>{props.name}</Text>
@@ -185,8 +186,8 @@ const _s = StyleSheet.create({
   },
   btnContainer: {
     ..._style.mr10,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   btnSubmitText: {
     color: '#68BBE3',

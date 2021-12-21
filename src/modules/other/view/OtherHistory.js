@@ -1,3 +1,4 @@
+/* eslint-disable */
 import React, {useCallback, useEffect, useState} from 'react';
 import {
   View,
@@ -30,7 +31,13 @@ import {runSqlQuery} from '../../database/DBSaga';
 import Modal from 'react-native-modal';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {dateTimeToFormat} from '../../../util';
-import { apiGetTrxDetailByTrxHeaderId, apiGetTrxHeaderByDate, apiGetTrxHeaderByDateBetween, apiInsertTrxHeaderVoid, apiUpdateTrxHeaderStatus } from '../../../config/Api';
+import {
+  apiGetTrxDetailByTrxHeaderId,
+  apiGetTrxHeaderByDate,
+  apiGetTrxHeaderByDateBetween,
+  apiInsertTrxHeaderVoid,
+  apiUpdateTrxHeaderStatus,
+} from '../../../config/Api';
 
 function OtherHistory() {
   const user = useSelector(state => state.user);
@@ -49,6 +56,9 @@ function OtherHistory() {
   const [filterStatusFocus, setFilterStatusFocus] = useState(0);
   const [filterStatusFocusPrev, setFilterStatusFocusPrev] =
     useState(filterStatusFocus);
+  const [filterOjolFocus, setFilterOjolFocus] = useState(0);
+  const [filterOjolFocusPrev, setFilterOjolFocusPrev] =
+    useState(filterOjolFocus);
   const [filterVisible, setFilterVisible] = useState(false);
 
   const [dateFilter, setDateFilter] = useState(new Date());
@@ -62,6 +72,7 @@ function OtherHistory() {
 
   const filterItem = ['Hari ini', 'Kemarin', '1 Minggu Terakhir'];
   const filterStatus = ['Semua', 'Simpan', 'Hapus', 'Void'];
+  const filterOjol = ['Semua', 'Ya', 'Tidak'];
 
   const headerTable = [
     {
@@ -91,6 +102,10 @@ function OtherHistory() {
     {
       key: 'ref_void_id',
       value: 'Ref',
+    },
+    {
+      key: 'ojol',
+      value: 'Ojol',
     },
   ];
 
@@ -122,6 +137,8 @@ function OtherHistory() {
       setFilterItemFocus(0);
       setFilterStatusFocus(0);
       setFilterStatusFocusPrev(0);
+      setFilterOjolFocus(0);
+      setFilterOjolFocusPrev(0);
       return () => unsubscribe;
     }, []),
   );
@@ -139,7 +156,12 @@ function OtherHistory() {
   useEffect(async () => {
     await runApiGetByDate();
     setFilterItemModalFocus(filterItemFocus);
-  }, [filterItemFocus, filterStatusFocusPrev, dateFilterPrev]);
+  }, [
+    filterItemFocus,
+    filterStatusFocusPrev,
+    dateFilterPrev,
+    filterOjolFocusPrev,
+  ]);
 
   async function runApiGetByDate() {
     let today = new Date();
@@ -163,6 +185,9 @@ function OtherHistory() {
         ? `%${filterStatus[filterStatusFocus].toUpperCase()}%`
         : '%%',
     );
+    param.push(
+      filterOjolFocus != 0 ? `%${filterOjolFocus == 1 ? 1 : 0}%` : '%%',
+    );
     if (filterItem[filterItemFocus] == '1 Minggu Terakhir') {
       let param = [];
       let tomorrow = new Date();
@@ -174,15 +199,37 @@ function OtherHistory() {
           ? `%${filterStatus[filterStatusFocus].toUpperCase()}%`
           : '%%',
       );
+      param.push(
+        filterOjolFocus != 0 ? `%${filterOjolFocus == 1 ? 1 : 0}%` : '%%',
+      );
       await apiGetTrxHeaderByDateBetween(dispatch, param);
     } else {
       await apiGetTrxHeaderByDate(dispatch, param);
     }
 
-    if (filterStatusFocus != 0) setCounterFilter(1);
-    if (filterItemFocus != 0) setCounterFilter(1);
-    if (filterItemFocus == 0 && filterStatusFocus == 0) setCounterFilter(0);
-    if (filterItemFocus != 0 && filterStatusFocus != 0) setCounterFilter(2);
+    if (filterItemFocus == 0 && filterStatusFocus == 0 && filterOjolFocus == 0)
+      setCounterFilter(0);
+    if (
+      filterItemFocus != 0 &&
+      filterStatusFocus != 0 &&
+      filterOjolFocus != 0
+    ) {
+      setCounterFilter(3);
+    } else {
+      let tmp = 0;
+      if (filterStatusFocus != 0) {
+        setCounterFilter(tmp + 1);
+        tmp++;
+      }
+      if (filterItemFocus != 0) {
+        setCounterFilter(tmp + 1);
+        tmp++;
+      }
+      if (filterOjolFocus != 0) {
+        setCounterFilter(tmp + 1);
+        tmp++;
+      }
+    }
   }
 
   function apiGetTotalItemByRefVoidId(param) {
@@ -282,7 +329,6 @@ function OtherHistory() {
     );
   }
 
-
   function voidInvoice() {
     Alert.alert(
       'Confirmation',
@@ -319,6 +365,7 @@ function OtherHistory() {
             paramHeader.push(user.store.id);
             paramHeader.push(user.store.name);
             paramHeader.push('N');
+            paramHeader.push(history.ojol);
             await apiInsertTrxHeaderVoid(dispatch, paramHeader);
             await runApiGetByDate();
             Alert.alert('Information', 'Transaction successfully voided!', [
@@ -358,6 +405,10 @@ function OtherHistory() {
                 v.key == 'grand_total' ||
                 v.key == 'total_item'
                   ? stringToCurrency(item[v.key])
+                  : v.key == 'ojol'
+                  ? item[v.key] == 1
+                    ? 'Ya'
+                    : 'Tidak'
                   : item[v.key]}
               </Text>
             </View>
@@ -457,15 +508,22 @@ function OtherHistory() {
   async function handleFilter() {
     await setFilterItemFocus(filterItemModalFocus);
     await setFilterStatusFocusPrev(filterStatusFocus);
+    await setFilterOjolFocusPrev(filterOjolFocus);
     await setFilterVisible(!filterVisible);
     await setDateFilterPrev(dateFilter);
 
-    if (filterItemModalFocus != 0 && filterStatusFocus != 0) {
-      setCounterFilter(2);
-    } else if (filterItemModalFocus == 0 && filterStatusFocus == 0) {
+    if (
+      filterItemModalFocus != 0 &&
+      filterStatusFocus != 0 &&
+      filterOjolFocus != 0
+    ) {
+      setCounterFilter(3);
+    } else if (
+      filterItemModalFocus == 0 &&
+      filterStatusFocus == 0 &&
+      filterOjolFocus == 0
+    ) {
       setCounterFilter(0);
-    } else if (filterItemModalFocus != 0 || filterStatusFocus != 0) {
-      setCounterFilter(1);
     }
   }
 
@@ -474,6 +532,7 @@ function OtherHistory() {
     setFilterItemModalFocus(filterItemFocus);
     setFilterStatusFocus(filterStatusFocusPrev);
     setFilterVisible(!filterVisible);
+    setFilterOjolFocus(filterOjolFocusPrev);
   }
 
   return (
@@ -513,6 +572,7 @@ function OtherHistory() {
                   setFilterItemModalFocus(0);
                   // setFilterStatusFocusPrev(filterStatusFocus)
                   setFilterStatusFocus(0);
+                  setFilterOjolFocus(0);
                 }}>
                 <Text style={[_style.modalHeader, {color: '#68BBE3'}]}>
                   Reset
@@ -567,6 +627,25 @@ function OtherHistory() {
                   ]}
                   activeOpacity={1}
                   onPress={() => setFilterStatusFocus(index)}>
+                  <View style={_style.rowDirectionCenter}>
+                    <Text style={_style.filterText}>{item}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={_style.filterHeader}>Ojol</Text>
+            <View style={[_style.rowDirection, _style.mt10]}>
+              {filterOjol.map((item, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    _style.filterBtn,
+                    filterOjolFocus == index
+                      ? {borderColor: '#274472', borderWidth: 1}
+                      : null,
+                  ]}
+                  activeOpacity={1}
+                  onPress={() => setFilterOjolFocus(index)}>
                   <View style={_style.rowDirectionCenter}>
                     <Text style={_style.filterText}>{item}</Text>
                   </View>

@@ -1,3 +1,4 @@
+/* eslint-disable */
 import React, {useCallback, useEffect, useState} from 'react';
 import {
   View,
@@ -8,7 +9,7 @@ import {
   StyleSheet,
   TouchableHighlight,
   TextInput,
-  Alert
+  Alert,
 } from 'react-native';
 import {useDispatch, useSelector} from 'react-redux';
 import Container from '../../../components/Container';
@@ -27,7 +28,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import {dateTimeToFormat} from '../../../util';
 
 function OtherDatabaseReport() {
-  const user = useSelector(state => state.user);  
+  const user = useSelector(state => state.user);
   const [historyList, setHistoryList] = useState([]);
   const [history, setHistory] = useState({});
   const [cartList, setCartList] = useState([]);
@@ -38,6 +39,9 @@ function OtherDatabaseReport() {
   const [filterStatusFocus, setFilterStatusFocus] = useState(0);
   const [filterStatusFocusPrev, setFilterStatusFocusPrev] =
     useState(filterStatusFocus);
+  const [filterOjolFocus, setFilterOjolFocus] = useState(0);
+  const [filterOjolFocusPrev, setFilterOjolFocusPrev] =
+    useState(filterOjolFocus);
   const [filterVisible, setFilterVisible] = useState(false);
 
   const [dateFilter, setDateFilter] = useState(new Date());
@@ -53,6 +57,7 @@ function OtherDatabaseReport() {
 
   const filterItem = ['Hari ini', 'Kemarin', '1 Minggu Terakhir'];
   const filterStatus = ['Semua', 'Simpan', 'Hapus', 'Bayar', 'Void'];
+  const filterOjol = ['Semua', 'Ya', 'Tidak'];
 
   const headerTable = [
     {
@@ -82,6 +87,10 @@ function OtherDatabaseReport() {
     {
       key: 'trxHeader_refVoidId',
       value: 'Ref',
+    },
+    {
+      key: 'trxHeader_ojol',
+      value: 'Ojol',
     },
     {
       key: 'trxHeader_storeId',
@@ -121,6 +130,8 @@ function OtherDatabaseReport() {
       setFilterItemFocus(0);
       setFilterStatusFocus(0);
       setFilterStatusFocusPrev(0);
+      setFilterOjolFocus(0);
+      setFilterOjolFocusPrev(0);
       return () => unsubscribe;
     }, []),
   );
@@ -134,7 +145,13 @@ function OtherDatabaseReport() {
   useEffect(async () => {
     await runApiGetByDate();
     setFilterItemModalFocus(filterItemFocus);
-  }, [filterItemFocus, filterStatusFocusPrev, dateFilterPrev, storeId]);
+  }, [
+    filterItemFocus,
+    filterStatusFocusPrev,
+    dateFilterPrev,
+    storeId,
+    filterOjolFocusPrev,
+  ]);
 
   function runApiGetByDate() {
     let today = new Date();
@@ -158,6 +175,8 @@ function OtherDatabaseReport() {
         ? `%${filterStatus[filterStatusFocus].toUpperCase()}%`
         : '%%';
     obj.storeId = storeId;
+    obj.ojol =
+      filterOjolFocus != 0 ? `%${filterOjolFocus == 1 ? 1 : 0}%` : '%%';
     if (filterItem[filterItemFocus] == '1 Minggu Terakhir') {
       let tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
@@ -169,10 +188,31 @@ function OtherDatabaseReport() {
       apiGetByDate(obj);
     }
 
-    if (filterStatusFocus != 0) setCounterFilter(1);
-    if (filterItemFocus != 0) setCounterFilter(1);
-    if (filterItemFocus == 0 && filterStatusFocus == 0) setCounterFilter(0);
-    if (filterItemFocus != 0 && filterStatusFocus != 0) setCounterFilter(2);
+    console.log(obj);
+
+    if (filterItemFocus == 0 && filterStatusFocus == 0 && filterOjolFocus == 0)
+      setCounterFilter(0);
+    if (
+      filterItemFocus != 0 &&
+      filterStatusFocus != 0 &&
+      filterOjolFocus != 0
+    ) {
+      setCounterFilter(3);
+    } else {
+      let tmp = 0;
+      if (filterStatusFocus != 0) {
+        setCounterFilter(tmp + 1);
+        tmp++;
+      }
+      if (filterItemFocus != 0) {
+        setCounterFilter(tmp + 1);
+        tmp++;
+      }
+      if (filterOjolFocus != 0) {
+        setCounterFilter(tmp + 1);
+        tmp++;
+      }
+    }
   }
 
   async function apiGetByDate(param) {
@@ -183,38 +223,40 @@ function OtherDatabaseReport() {
         params: {
           date: param.date,
           status: param.status,
+          ojol: param.ojol,
           storeId: param.storeId,
         },
       },
-    ).then(async res => {
-      let sumGrandTotal = 0;
-      let sumTotalDiscount = 0;
-      let result = res.data.result;
+    )
+      .then(async res => {
+        let sumGrandTotal = 0;
+        let sumTotalDiscount = 0;
+        let result = res.data.result;
 
-      if (result.length > 0) {
-        for (let i = 0; i < result.length; i++) {
-          sumGrandTotal +=
-            result[i].trxHeader_status == 'BAYAR'
-              ? parseInt(result[i].trxHeader_grandTotal)
-              : 0;
-          sumTotalDiscount +=
-            result[i].trxHeader_status == 'BAYAR'
-              ? parseInt(result[i].trxHeader_discount)
-              : 0;
+        if (result.length > 0) {
+          for (let i = 0; i < result.length; i++) {
+            sumGrandTotal +=
+              result[i].trxHeader_status == 'BAYAR'
+                ? parseInt(result[i].trxHeader_grandTotal)
+                : 0;
+            sumTotalDiscount +=
+              result[i].trxHeader_status == 'BAYAR'
+                ? parseInt(result[i].trxHeader_discount)
+                : 0;
+          }
+          await setHistory(result[0]);
+          await setSumGrandTotal(sumGrandTotal);
+          await setSumTotalDiscount(sumTotalDiscount);
+          await setHistoryList(result);
+        } else {
+          await setHistory({});
+          await setHistoryList([]);
+          await setCartList([]);
         }
-        await setHistory(result[0]);
-        await setSumGrandTotal(sumGrandTotal);
-        await setSumTotalDiscount(sumTotalDiscount);
-        await setHistoryList(result);
-      } else {
-        await setHistory({});
-        await setHistoryList([]);
-        await setCartList([]);
-      }
-    })
-    .catch(err =>{
-      console.error(err.message)
-    });
+      })
+      .catch(err => {
+        console.error(err.message);
+      });
   }
 
   async function apiGetByDateBetween(param) {
@@ -226,38 +268,40 @@ function OtherDatabaseReport() {
           startDate: param.startDate,
           endDate: param.endDate,
           status: param.status,
+          ojol: param.ojol,
           storeId: param.storeId,
         },
       },
-    ).then(async res => {
-      let sumGrandTotal = 0;
-      let sumTotalDiscount = 0;
-      let result = res.data.result;
+    )
+      .then(async res => {
+        let sumGrandTotal = 0;
+        let sumTotalDiscount = 0;
+        let result = res.data.result;
 
-      if (result.length > 0) {
-        for (let i = 0; i < result.length; i++) {
-          sumGrandTotal +=
-            result[i].trxHeader_status == 'BAYAR'
-              ? parseInt(result[i].trxHeader_grandTotal)
-              : 0;
-          sumTotalDiscount +=
-            result[i].trxHeader_status == 'BAYAR'
-              ? parseInt(result[i].trxHeader_discount)
-              : 0;
+        if (result.length > 0) {
+          for (let i = 0; i < result.length; i++) {
+            sumGrandTotal +=
+              result[i].trxHeader_status == 'BAYAR'
+                ? parseInt(result[i].trxHeader_grandTotal)
+                : 0;
+            sumTotalDiscount +=
+              result[i].trxHeader_status == 'BAYAR'
+                ? parseInt(result[i].trxHeader_discount)
+                : 0;
+          }
+          await setHistory(result[0]);
+          await setSumGrandTotal(sumGrandTotal);
+          await setSumTotalDiscount(sumTotalDiscount);
+          await setHistoryList(result);
+        } else {
+          await setHistory({});
+          await setHistoryList([]);
+          await setCartList([]);
         }
-        await setHistory(result[0]);
-        await setSumGrandTotal(sumGrandTotal);
-        await setSumTotalDiscount(sumTotalDiscount);
-        await setHistoryList(result);
-      } else {
-        await setHistory({});
-        await setHistoryList([]);
-        await setCartList([]);
-      }
-    })
-    .catch(err =>{
-      console.error(err.message)
-    });
+      })
+      .catch(err => {
+        console.error(err.message);
+      });
   }
 
   function dataRender({item, index}) {
@@ -283,6 +327,10 @@ function OtherDatabaseReport() {
                   ? stringToCurrency(item[v.key])
                   : v.key == 'trxHeader_createdDate'
                   ? dateTimeToFormat(new Date(item[v.key]))
+                  : v.key == 'trxHeader_ojol'
+                  ? item[v.key] == 1
+                    ? 'Ya'
+                    : 'Tidak'
                   : item[v.key]}
               </Text>
             </View>
@@ -379,18 +427,21 @@ function OtherDatabaseReport() {
     await setStoreId(storeIdChange);
     await setFilterItemFocus(filterItemModalFocus);
     await setFilterStatusFocusPrev(filterStatusFocus);
+    await setFilterOjolFocusPrev(filterOjolFocus);
     await setFilterVisible(!filterVisible);
     await setDateFilterPrev(dateFilter);
 
     if (
       filterItemModalFocus != 0 &&
       filterStatusFocus != 0 &&
-      storeIdChange.length != 0
+      storeIdChange.length != 0 &&
+      filterOjolFocus != 0
     ) {
-      setCounterFilter(3);
+      setCounterFilter(4);
     } else if (
       filterItemModalFocus == 0 &&
       filterStatusFocus == 0 &&
+      filterOjolFocus == 0 &&
       storeIdChange.length == 0
     ) {
       setCounterFilter(0);
@@ -398,6 +449,7 @@ function OtherDatabaseReport() {
       let tmp = 0;
       if (filterItemModalFocus != 0) tmp++;
       if (filterStatusFocus != 0) tmp++;
+      if (filterOjolFocus != 0) tmp++;
       if (storeIdChange.length > 0) tmp++;
       setCounterFilter(tmp);
     }
@@ -408,6 +460,7 @@ function OtherDatabaseReport() {
     setFilterItemModalFocus(filterItemFocus);
     setFilterStatusFocus(filterStatusFocusPrev);
     setFilterVisible(!filterVisible);
+    setFilterOjolFocus(filterOjolFocusPrev);
   }
 
   return (
@@ -446,6 +499,7 @@ function OtherDatabaseReport() {
                   setIsDateFilter(false);
                   setFilterItemModalFocus(0);
                   setFilterStatusFocus(0);
+                  setFilterOjolFocus(0);
                 }}>
                 <Text style={[_style.modalHeader, {color: '#68BBE3'}]}>
                   Reset
@@ -507,6 +561,25 @@ function OtherDatabaseReport() {
                   </TouchableOpacity>
                 ))}
               </View>
+              <Text style={_style.filterHeader}>Ojol</Text>
+              <View style={[_style.rowDirection, _style.mt10]}>
+                {filterOjol.map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={[
+                      _style.filterBtn,
+                      filterOjolFocus == index
+                        ? {borderColor: '#274472', borderWidth: 1}
+                        : null,
+                    ]}
+                    activeOpacity={1}
+                    onPress={() => setFilterOjolFocus(index)}>
+                    <View style={_style.rowDirectionCenter}>
+                      <Text style={_style.filterText}>{item}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
               <Text style={_style.filterHeader}>Store ID</Text>
               <TextInput
                 style={_style.fieldText}
@@ -520,6 +593,7 @@ function OtherDatabaseReport() {
             {(filterItemModalFocus != filterItemFocus ||
               filterStatusFocus != filterStatusFocusPrev ||
               storeIdChange != storeId ||
+              filterOjolFocus != filterOjolFocusPrev ||
               dateFilter != dateFilterPrev) && (
               <Button btnText="Simpan" onPress={() => handleFilter()} />
             )}

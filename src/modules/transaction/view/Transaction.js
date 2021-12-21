@@ -1,3 +1,4 @@
+/* eslint-disable */
 import React, {memo, useCallback, useEffect, useMemo, useState} from 'react';
 import {
   FlatList,
@@ -49,6 +50,7 @@ import {
   apiUpdateTrxHeader,
   apiUpdateTrxHeaderStatus,
 } from '../../../config/Api';
+import CheckBox from '@react-native-community/checkbox';
 
 const discountScheme = Yup.object().shape({
   discount: Yup.string()
@@ -63,14 +65,13 @@ const formList = [
   },
 ];
 
-const MemoFlatList = memo((props) =>{
-  console.log(`from : ${props.from}`)
-  return (
-    <FlatList
-      {...props}
-    />
-  );
-}, (prevProps, nextProps)=>prevProps.renderItem === nextProps.renderItem)
+const MemoFlatList = memo(
+  props => {
+    console.log(`from : ${props.from}`);
+    return <FlatList {...props} />;
+  },
+  (prevProps, nextProps) => prevProps.renderItem === nextProps.renderItem,
+);
 
 function Transaction() {
   const master = useSelector(state => state.master);
@@ -96,6 +97,7 @@ function Transaction() {
   const [discountModal, setDiscountModal] = useState(false);
   const [discountValue, setDiscountValue] = useState(0);
   const [percentageValue, setPercentageValue] = useState('');
+  const [toggleCheckBox, setToggleCheckBox] = useState(true);
 
   const formik = useFormik({
     initialValues: {
@@ -138,7 +140,7 @@ function Transaction() {
     },
   ];
 
-  useEffect(async () => {    
+  useEffect(async () => {
     if (
       category != null &&
       category.items != null &&
@@ -157,7 +159,7 @@ function Transaction() {
   useEffect(async () => {
     if (transaction.historyCartList != null) {
       let tmp = transaction.historyCartList;
-      let newArray = tmp.reduce((x, item)=>{
+      let newArray = tmp.reduce((x, item) => {
         let obj = {
           id_trx_detail: item.id,
           code: item.item_code,
@@ -166,11 +168,11 @@ function Transaction() {
           qty: parseInt(item.quantity),
           discount: parseInt(item.discount),
           total: parseInt(item.total),
-        }
-        x.push(obj)  
-        return x
+        };
+        x.push(obj);
+        return x;
       }, []);
-      
+
       setCartList(newArray);
       calculate(newArray, transaction.historyCartListHeader.discount);
       setCartUpdateIndex(!cartUpdateIndex);
@@ -178,6 +180,9 @@ function Transaction() {
 
     if (transaction.historyCartListHeader != null) {
       setDiscountValue(transaction.historyCartListHeader.discount);
+      setToggleCheckBox(
+        transaction.historyCartListHeader.ojol == 1 ? true : false,
+      );
       formik.setFieldValue(
         'discount',
         transaction.historyCartListHeader.discount.toString(),
@@ -186,7 +191,7 @@ function Transaction() {
   }, [transaction.historyCartList, transaction.historyCartListHeader]);
 
   useFocusEffect(
-    useCallback(() => {      
+    useCallback(() => {
       const unsubscribe = getCategoryItemFromStoreMaster();
       const onBackPress = e => {
         if (transaction.historyCartListHeader != null) {
@@ -200,7 +205,7 @@ function Transaction() {
 
       BackHandler.addEventListener('hardwareBackPress', onBackPress);
       return () => {
-        console.log('clean-up')
+        console.log('clean-up');
         BackHandler.removeEventListener('hardwareBackPress', onBackPress);
         unsubscribe;
       };
@@ -327,7 +332,7 @@ function Transaction() {
     }
   }
 
-  function dataRenderCategory({item, index}) {    
+  function dataRenderCategory({item, index}) {
     return (
       <TouchableHighlight
         key={index}
@@ -349,7 +354,7 @@ function Transaction() {
         </>
       </TouchableHighlight>
     );
-  }  
+  }
 
   function categoryHeaderRender() {
     return (
@@ -546,6 +551,7 @@ function Transaction() {
       paramHeader.push(
         transaction.historyCartListHeader.flag == 'Y' ? 'E' : 'N',
       );
+      paramHeader.push(toggleCheckBox == true ? 1 : 0);
       paramHeader.push(transaction.historyCartListHeader.id);
 
       await apiUpdateTrxHeader(dispatch, paramHeader);
@@ -568,7 +574,7 @@ function Transaction() {
         await listSql.push(sql);
       }
 
-      apiBatchSql(dispatch, listSql)    
+      apiBatchSql(dispatch, listSql);
 
       dispatch(setHistoryCartList(null));
       dispatch(setHistoryCartListHeader(null));
@@ -583,6 +589,7 @@ function Transaction() {
       paramHeader.push(user.store.id);
       paramHeader.push(user.store.name);
       paramHeader.push('N');
+      paramHeader.push(toggleCheckBox == true ? 1 : 0);
       await apiInsertTrxHeader(dispatch, paramHeader);
 
       let lastId = await apiGetLastIdTrxHeader();
@@ -607,8 +614,8 @@ function Transaction() {
           user.store.name
         }', 'N')`;
         await listSql.push(sql);
-      }      
-      apiBatchSql(dispatch, listSql)
+      }
+      apiBatchSql(dispatch, listSql);
     }
 
     if (status == 'BAYAR') {
@@ -708,12 +715,18 @@ function Transaction() {
   //   console.log('render list')
   // }, [JSON.stringify(cartList)])
 
-  const memoDataRenderCategory = useCallback(dataRenderCategory, [category])
-  const memoCategoryHeaderRender = useCallback(categoryHeaderRender, [])
-  const memoDataRenderItems = useCallback(dataRenderItems, [category, itemsList, cartList.length == 0])
-  const memoItemsHeaderRender = useCallback(itemsHeaderRender, [])
-  const memoDataRenderCartList = useCallback(dataRenderCartList, [JSON.stringify(cartList)])
-  const memoCartListHeaderRender = useCallback(cartListHeaderRender, [])
+  const memoDataRenderCategory = useCallback(dataRenderCategory, [category]);
+  const memoCategoryHeaderRender = useCallback(categoryHeaderRender, []);
+  const memoDataRenderItems = useCallback(dataRenderItems, [
+    category,
+    itemsList,
+    cartList.length == 0,
+  ]);
+  const memoItemsHeaderRender = useCallback(itemsHeaderRender, []);
+  const memoDataRenderCartList = useCallback(dataRenderCartList, [
+    JSON.stringify(cartList),
+  ]);
+  const memoCartListHeaderRender = useCallback(cartListHeaderRender, []);
 
   return (
     <Container>
@@ -730,7 +743,7 @@ function Transaction() {
         <Header drawerBtn syncBtn name="Transaction" />
       )}
       <View style={_s.menuBarContainer}>
-        <View style={_style.flex1}>
+        <View style={_style.flex2}>
           <TextInput
             style={_style.searchField}
             placeholder="Search..."
@@ -738,11 +751,21 @@ function Transaction() {
           />
         </View>
         {cartList.length > 0 ? (
-          <View>
-            <TouchableOpacity onPress={clearCartList}>
-              <Text style={_s.hapusSemuaText}>Hapus semua</Text>
-            </TouchableOpacity>
-          </View>
+          <>
+            <View style={[_style.flexRowCenter]}>
+              <CheckBox
+                disabled={false}
+                value={toggleCheckBox}
+                onValueChange={newValue => setToggleCheckBox(newValue)}
+              />
+              <Text style={[_style.totalHeaderText, _style.mr10]}>Ojol</Text>
+            </View>
+            <View style={[_style.rowDirectionCenter]}>
+              <TouchableOpacity onPress={clearCartList}>
+                <Text style={_s.hapusSemuaText}>Hapus semua</Text>
+              </TouchableOpacity>
+            </View>
+          </>
         ) : null}
       </View>
       <View style={_style.flexRow}>
@@ -781,7 +804,7 @@ function Transaction() {
             keyExtractor={(item, index) => index}
             stickyHeaderIndices={[0]}
           />
-          <View style={_s.totalHeaderBorder}>
+          <View style={[_s.totalHeaderBorder]}>
             <View style={_style.flex1}>
               <Text style={_style.totalHeaderText}>Discount</Text>
             </View>
@@ -811,12 +834,14 @@ function Transaction() {
             <View style={_style.rowDirection}>
               <View style={[_style.flex1, _style.tableSeparator]}>
                 <Button
+                  style={{paddingVertical: 8}}
                   btnText="Bayar & Print"
                   onPress={() => showAlertBayarAndSimpan('BAYAR')}
                 />
               </View>
               <View style={_style.flex1}>
                 <Button
+                  style={{paddingVertical: 8}}
                   btnText="Simpan"
                   onPress={() => showAlertBayarAndSimpan('SIMPAN')}
                 />
